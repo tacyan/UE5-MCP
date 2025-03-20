@@ -6,6 +6,7 @@ MCPシステム起動スクリプト
 
 このスクリプトは、Model Context Protocol (MCP) システム全体を簡単に起動するためのユーティリティです。
 指定したモードに応じて、必要なMCPコンポーネントを起動します。
+Windows、macOS、Linuxのすべてのプラットフォームで動作します。
 
 主な機能:
 - 「all」モード: すべてのコンポーネント（サーバー、Blender-MCP、UE5-MCP）を起動
@@ -26,11 +27,21 @@ import argparse
 import time
 import signal
 import logging
+import json
+import platform
 import yaml
 from dotenv import load_dotenv
 
 # 環境変数のロード
 load_dotenv()
+
+# OSの検出
+IS_WINDOWS = platform.system() == "Windows"
+IS_MAC = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
+
+# Pythonコマンドの設定
+PYTHON_CMD = "python" if IS_WINDOWS else "python3"
 
 # ロギングの設定
 logging.basicConfig(
@@ -53,8 +64,33 @@ def load_config():
         dict: 設定情報
     """
     try:
-        if os.path.exists('config.yml'):
-            with open('config.yml', 'r') as f:
+        # JSONファイルの優先度を高く設定
+        if os.path.exists('mcp_settings.json'):
+            logger.info("mcp_settings.json から設定を読み込みます")
+            with open('mcp_settings.json', 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                server_config = settings.get('server', {})
+                blender_config = settings.get('modules', {}).get('blender', {})
+                unreal_config = settings.get('modules', {}).get('unreal', {})
+                
+                return {
+                    'server': {
+                        'host': server_config.get('host', '127.0.0.1'),
+                        'port': server_config.get('port', 5000),
+                        'debug': server_config.get('debug', False)
+                    },
+                    'blender': {
+                        'enabled': blender_config.get('enabled', True),
+                        'port': blender_config.get('port', 5001)
+                    },
+                    'unreal': {
+                        'enabled': unreal_config.get('enabled', True),
+                        'port': unreal_config.get('port', 5002)
+                    }
+                }
+        elif os.path.exists('config.yml'):
+            logger.info("config.yml から設定を読み込みます")
+            with open('config.yml', 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
         else:
             logger.warning("設定ファイルが見つかりません。デフォルト設定を使用します。")
@@ -83,7 +119,7 @@ def run_server():
     """
     logger.info("MCPサーバーを起動します...")
     try:
-        process = subprocess.Popen([sys.executable, 'server.py'])
+        process = subprocess.Popen([PYTHON_CMD, 'server.py'])
         processes.append(process)
         logger.info(f"MCPサーバーが起動しました (PID: {process.pid})")
         # サーバーが起動するまで少し待機
@@ -99,7 +135,7 @@ def run_blender_mcp():
     """
     logger.info("Blender-MCPを起動します...")
     try:
-        process = subprocess.Popen([sys.executable, 'blender_mcp.py'])
+        process = subprocess.Popen([PYTHON_CMD, 'blender_mcp.py'])
         processes.append(process)
         logger.info(f"Blender-MCPが起動しました (PID: {process.pid})")
         return process
@@ -113,7 +149,7 @@ def run_ue5_mcp():
     """
     logger.info("UE5-MCPを起動します...")
     try:
-        process = subprocess.Popen([sys.executable, 'ue5_mcp.py'])
+        process = subprocess.Popen([PYTHON_CMD, 'ue5_mcp.py'])
         processes.append(process)
         logger.info(f"UE5-MCPが起動しました (PID: {process.pid})")
         return process
@@ -153,6 +189,11 @@ def print_system_info():
     システム情報を表示する
     """
     logger.info("=== MCP システム情報 ===")
+    
+    # OS情報
+    logger.info(f"OS: {platform.system()} ({platform.platform()})")
+    logger.info(f"Python: {platform.python_version()}")
+    
     config = load_config()
     
     # MCPサーバー情報
@@ -195,8 +236,12 @@ def main():
     args = parser.parse_args()
     
     # シグナルハンドラの設定（Ctrl+Cで終了時に全プロセスを停止）
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    try:
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+    except (AttributeError, ValueError) as e:
+        # Windowsでは一部のシグナルが使用できないため
+        logger.warning(f"シグナルハンドラの設定中に警告が発生しました: {str(e)}")
     
     # システム情報の表示
     print_system_info()

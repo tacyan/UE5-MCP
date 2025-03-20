@@ -1,0 +1,31 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 5000,
+    "autoStart": true
+  },
+  "modules": {
+    "blender": {
+      "enabled": true,
+      "port": 5001
+    },
+    "unreal": {
+      "enabled": true,
+      "port": 5002
+    }
+  },
+  "ai": {
+    "provider": "mock",
+    "model": "gpt-4"
+  },
+  "paths": {
+    "blender": "",
+    "unreal": "",
+    "exports": "./exports"
+  },
+  "logging": {
+    "level": "info",
+    "file": "mcp.log"
+  },
+  "version": "1.0.0"
+}

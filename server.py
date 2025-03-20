@@ -14,19 +14,25 @@ Blenderおよびアンリアルエンジン5との連携を可能にし、AIド�
 - ミドルウェア通信レイヤーの管理
 
 制限事項:
-- 設定ファイルが必要です（config.yml）
+- 設定ファイル（config.yml または mcp_settings.json）が必要です
 - OpenAI APIキーが必要です（.envファイルまたは環境変数で設定）。キーがない場合はモックレスポンスを返します。
 """
 
 import os
 import logging
 import json
+import platform
 from flask import Flask, request, jsonify, render_template_string
 import yaml
 from dotenv import load_dotenv
 
 # 環境変数のロード
 load_dotenv()
+
+# OSの検出
+IS_WINDOWS = platform.system() == "Windows"
+IS_MAC = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
 
 # ロギングの設定
 logging.basicConfig(
@@ -44,36 +50,67 @@ def loadConfig():
     """
     設定ファイルを読み込む関数
 
-    設定ファイル(config.yml)から設定を読み込みます。
+    mcp_settings.json (優先) または config.yml から設定を読み込みます。
     ファイルが存在しない場合はデフォルト設定を使用します。
 
     戻り値:
         dict: 設定情報を含む辞書
     """
     try:
-        with open('config.yml', 'r') as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        logger.warning("設定ファイルが見つかりません。デフォルト設定を使用します。")
-        return {
-            'server': {
-                'host': '127.0.0.1',
-                'port': 5000,
-                'debug': False
-            },
-            'ai': {
-                'provider': 'mock',  # OpenAIキーがない場合はmockモードをデフォルトに
-                'model': 'gpt-4'
-            },
-            'blender': {
-                'enabled': True,
-                'port': 5001
-            },
-            'unreal': {
-                'enabled': True,
-                'port': 5002
+        # まず JSON 設定ファイルを探す (優先)
+        if os.path.exists('mcp_settings.json'):
+            logger.info("mcp_settings.json から設定を読み込みます")
+            with open('mcp_settings.json', 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                return {
+                    'server': {
+                        'host': settings.get('server', {}).get('host', '127.0.0.1'),
+                        'port': settings.get('server', {}).get('port', 5000),
+                        'debug': settings.get('server', {}).get('debug', False)
+                    },
+                    'ai': {
+                        'provider': settings.get('ai', {}).get('provider', 'mock'),
+                        'model': settings.get('ai', {}).get('model', 'gpt-4')
+                    },
+                    'blender': {
+                        'enabled': settings.get('modules', {}).get('blender', {}).get('enabled', True),
+                        'port': settings.get('modules', {}).get('blender', {}).get('port', 5001)
+                    },
+                    'unreal': {
+                        'enabled': settings.get('modules', {}).get('unreal', {}).get('enabled', True),
+                        'port': settings.get('modules', {}).get('unreal', {}).get('port', 5002)
+                    },
+                    'logging': {
+                        'level': settings.get('logging', {}).get('level', 'info'),
+                        'file': settings.get('logging', {}).get('file', 'mcp.log')
+                    }
+                }
+        # 次に YAML 設定ファイルを探す
+        elif os.path.exists('config.yml'):
+            logger.info("config.yml から設定を読み込みます")
+            with open('config.yml', 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f)
+        else:
+            logger.warning("設定ファイルが見つかりません。デフォルト設定を使用します。")
+            return {
+                'server': {
+                    'host': '127.0.0.1',
+                    'port': 5000,
+                    'debug': False
+                },
+                'ai': {
+                    'provider': 'mock',  # OpenAIキーがない場合はmockモードをデフォルトに
+                    'model': 'gpt-4'
+                },
+                'blender': {
+                    'enabled': True,
+                    'port': 5001
+                },
+                'unreal': {
+                    'enabled': True,
+                    'port': 5002
+                }
             }
-        }
     except Exception as e:
         logger.error(f"設定ファイルの読み込み中にエラーが発生しました: {str(e)}")
         raise
@@ -171,6 +208,12 @@ HTML_TEMPLATE = '''
             border-radius: 3px;
             overflow-x: auto;
         }
+        .system-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -182,6 +225,13 @@ HTML_TEMPLATE = '''
         <div class="status-item"><span class="status-label">AI プロバイダー:</span> {{status.ai.provider}} ({{status.ai.status}})</div>
         <div class="status-item"><span class="status-label">Blender:</span> {{status.blender.status}}</div>
         <div class="status-item"><span class="status-label">Unreal Engine:</span> {{status.unreal.status}}</div>
+    </div>
+    
+    <div class="system-info">
+        <h2>システム情報</h2>
+        <div class="status-item"><span class="status-label">OS:</span> {{status.system.os}}</div>
+        <div class="status-item"><span class="status-label">Platform:</span> {{status.system.platform}}</div>
+        <div class="status-item"><span class="status-label">Python:</span> {{status.system.python}}</div>
     </div>
     
     <h2>使用可能なAPIエンドポイント</h2>
@@ -263,6 +313,11 @@ def home():
             'unreal': {
                 'enabled': config['unreal']['enabled'],
                 'status': 'connected' if config['unreal']['enabled'] else 'disabled'
+            },
+            'system': {
+                'os': platform.system(),
+                'platform': platform.platform(),
+                'python': platform.python_version()
             }
         }
         
@@ -301,6 +356,14 @@ def getStatus():
             'unreal': {
                 'enabled': config['unreal']['enabled'],
                 'status': 'connected' if config['unreal']['enabled'] else 'disabled'
+            },
+            'system': {
+                'os': platform.system(),
+                'platform': platform.platform(),
+                'python': platform.python_version(),
+                'is_windows': IS_WINDOWS,
+                'is_mac': IS_MAC,
+                'is_linux': IS_LINUX
             }
         }
         return jsonify(status)
@@ -444,6 +507,10 @@ if __name__ == '__main__':
         host = config['server']['host']
         port = config['server']['port']
         debug = config['server']['debug']
+        
+        # システム情報を表示
+        logger.info(f"実行環境: {platform.system()} ({platform.platform()})")
+        logger.info(f"Python バージョン: {platform.python_version()}")
         
         # AIモードの表示
         if has_openai:
