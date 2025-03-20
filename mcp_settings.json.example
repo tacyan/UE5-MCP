@@ -1,0 +1,36 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8000,
+    "debug": false
+  },
+  "modules": {
+    "blender": {
+      "enabled": true,
+      "port": 8001,
+      "path": "/path/to/blender",
+      "autostart": true
+    },
+    "unreal": {
+      "enabled": true,
+      "port": 8002,
+      "path": "/path/to/unreal/editor",
+      "autostart": true
+    }
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "temperature": 0.7
+  },
+  "paths": {
+    "blender": "",
+    "unreal": "",
+    "exports": "./exports"
+  },
+  "logging": {
+    "level": "info",
+    "file": "mcp.log"
+  },
+  "version": "1.0.0"
+} 
