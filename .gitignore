@@ -33,6 +33,7 @@ exports/
 # 設定ファイル
 ue5_mcp_config.yml
 blender_mcp_config.yml
+mcp_settings.json
 
 # 一時ファイル
 .DS_Store
