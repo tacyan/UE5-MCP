@@ -1,17 +1,17 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 5000,
+    "port": 8000,
     "autoStart": true
   },
   "modules": {
     "blender": {
       "enabled": true,
-      "port": 5001
+      "port": 8001
     },
     "unreal": {
       "enabled": true,
-      "port": 5002
+      "port": 8002
     }
   },
   "ai": {

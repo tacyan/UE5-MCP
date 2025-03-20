@@ -39,7 +39,7 @@ class CursorMCPClient:
     MCPサーバーとの通信を処理するクラス
     """
     
-    def __init__(self, server_host="127.0.0.1", server_port=5000):
+    def __init__(self, server_host="127.0.0.1", server_port=8000):
         """
         初期化メソッド
         

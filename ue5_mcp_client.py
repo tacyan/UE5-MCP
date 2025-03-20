@@ -18,12 +18,19 @@ UE5のPythonインタープリタを使用して、AIドリブンのゲーム開
 - MCPサーバーが実行されていることが前提です
 """
 
-import unreal
 import requests
 import json
 import logging
 import os
 import time
+
+# unrealモジュールの条件付きインポート
+try:
+    import unreal
+    UNREAL_AVAILABLE = True
+except ImportError:
+    UNREAL_AVAILABLE = False
+    print("警告: 'unreal'モジュールがインポートできません。このスクリプトはUnreal Engine内でのみ完全に動作します。")
 
 # ロギングの設定
 logging.basicConfig(
@@ -42,7 +49,7 @@ class UE5MCPClient:
     MCPサーバーとの通信を処理するクラス
     """
     
-    def __init__(self, server_host="127.0.0.1", server_port=5000):
+    def __init__(self, server_host="127.0.0.1", server_port=8000):
         """
         初期化メソッド
         
@@ -51,15 +58,19 @@ class UE5MCPClient:
             server_port (int): MCPサーバーのポート
         """
         self.server_url = f"http://{server_host}:{server_port}"
-        self.ue_version = unreal.SystemLibrary.get_engine_version()
         logger.info(f"MCPサーバーURL: {self.server_url}")
-        logger.info(f"Unreal Engine バージョン: {self.ue_version}")
         
-        # UE5通知システムの初期化
-        self.notification_style = unreal.EditorNotificationController().notification_style
-        self.notification_style.fade_in_duration = 0.5
-        self.notification_style.fade_out_duration = 0.5
-        self.notification_style.expire_duration = 5.0
+        if UNREAL_AVAILABLE:
+            self.ue_version = unreal.SystemLibrary.get_engine_version()
+            logger.info(f"Unreal Engine バージョン: {self.ue_version}")
+            
+            # UE5通知システムの初期化
+            self.notification_style = unreal.EditorNotificationController().notification_style
+            self.notification_style.fade_in_duration = 0.5
+            self.notification_style.fade_out_duration = 0.5
+            self.notification_style.expire_duration = 5.0
+        else:
+            logger.warning("Unreal Engineモジュールが利用できないため、一部の機能は無効化されています。")
     
     def show_notification(self, message, success=True):
         """
@@ -69,6 +80,10 @@ class UE5MCPClient:
             message (str): 表示するメッセージ
             success (bool): 成功メッセージかどうか
         """
+        if not UNREAL_AVAILABLE:
+            logger.info(f"通知: {message}")
+            return
+            
         try:
             controller = unreal.EditorNotificationController()
             self.notification_style.text_color = unreal.LinearColor(0.0, 1.0, 0.0, 1.0) if success else unreal.LinearColor(1.0, 0.0, 0.0, 1.0)
@@ -268,6 +283,10 @@ def connect_to_mcp():
     
     # サーバーステータスの確認
     status = client.check_server_status()
-    unreal.log(f"サーバーステータス: {json.dumps(status, indent=2, ensure_ascii=False)}")
+    
+    if UNREAL_AVAILABLE:
+        unreal.log(f"サーバーステータス: {json.dumps(status, indent=2, ensure_ascii=False)}")
+    else:
+        logger.info(f"サーバーステータス: {json.dumps(status, indent=2, ensure_ascii=False)}")
     
     return client 
