@@ -1,268 +1,149 @@
-# Model Context Protocol (MCP)
+# Model Context Protocol (MCP) フレームワーク
 
-## 概要
-Model Context Protocol (MCP) は、Blender 4.4.0と Unreal Engine 5.5 (UE5)にAI駆動の自動化機能を統合するフレームワークです。OpenAI APIを活用して、プロシージャル生成、アセット管理、ゲームプレイプログラミング支援などを実現します。
+MCPは、BlenderとUnreal Engine 5を連携させ、AIによるゲーム開発を支援するフレームワークです。自然言語コマンドを使用して3Dモデルを作成し、ゲームを構築できます。
 
 ## 主な機能
-- **AIによる自動化**: 自然言語コマンドを使用したシーン生成とアセット作成（OpenAI APIを使用）
-- **Blender-MCP**: Blenderでのモデリング、テクスチャリング、最適化の自動化
-- **UE5-MCP**: UE5でのレベルデザイン、Blueprint自動化、デバッグのサポート
-- **シームレスな統合**: BlenderからUE5へのアセット転送ワークフロー
-- **クロスプラットフォーム**: Windows、macOS、Linuxでの動作をサポート
 
-## インストール
+- **Blender-UE5連携**: Blenderで作成したモデルをUE5に直接転送
+- **AIアシスタント**: OpenAI GPT-4を活用した自然言語インターフェース
+- **3Dアセット生成**: 自然言語から3Dモデルを生成
+- **クロスプラットフォーム**: Windows、macOS、Linuxに対応
 
-### 前提条件
-- Python 3.x
-- Blender 4.4.0以降（Blender-MCPを使用する場合）
-- Unreal Engine 5.5以降（UE5-MCPを使用する場合）
-- OpenAI APIキー（AIアシスト機能を使用する場合）
+## 必要条件
 
-### インストール手順
-```bash
-# リポジトリをクローン
-git clone https://github.com/tacyan/UE5-MCP.git
-cd UE5-MCP
+- Python 3.9以上
+- Blender 3.6以上
+- Unreal Engine 5.3以上
+- OpenAI API キー（AIアシスト機能を使用する場合）
 
-# 依存関係のインストール
-pip install -r requirements.txt
+## クイックスタート
 
-# 設定
-cp .env.example .env
-cp mcp_settings.json.example mcp_settings.json
-# 必要に応じて.envとmcp_settings.jsonを編集
-```
+1. リポジトリをクローン:
+   ```bash
+   git clone https://github.com/yourusername/UE5-MCP.git
+   cd UE5-MCP
+   ```
 
-## セットアップと設定
+2. 依存パッケージのインストール:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 環境変数の設定
-`.env`ファイルで以下の設定を行います：
+3. 設定ファイルのセットアップ:
+   ```bash
+   # 設定ファイルのテンプレートをコピー
+   cp .env.example .env
+   cp mcp_settings.json.example mcp_settings.json
+   
+   # 自動セットアップスクリプトを実行（推奨）
+   python setup_mcp.py
+   ```
 
-```
-# OpenAI API設定
-OPENAI_API_KEY=your_openai_api_key_here
-
-# サーバー設定
-MCP_SERVER_HOST=127.0.0.1
-MCP_SERVER_PORT=8000
-
-# Blender設定
-BLENDER_ENABLED=true
-BLENDER_PORT=8001
-BLENDER_PATH=/path/to/blender
-
-# UE5設定
-UE5_ENABLED=true
-UE5_PORT=8002
-UE5_PATH=/path/to/unreal/editor
-```
-
-### MCP設定ファイル
-`mcp_settings.json`ファイルでシステム全体の設定を管理します：
-
-```json
-{
-  "server": {
-    "host": "127.0.0.1",
-    "port": 8000,
-    "debug": false
-  },
-  "modules": {
-    "blender": {
-      "enabled": true,
-      "port": 8001,
-      "path": "/path/to/blender",
-      "autostart": true
-    },
-    "unreal": {
-      "enabled": true,
-      "port": 8002,
-      "path": "/path/to/unreal/editor",
-      "autostart": true
-    }
-  },
-  "ai": {
-    "provider": "openai",
-    "model": "gpt-4",
-    "temperature": 0.7
-  },
-  "paths": {
-    "blender": "",
-    "unreal": "",
-    "exports": "./exports"
-  },
-  "logging": {
-    "level": "info",
-    "file": "mcp.log"
-  },
-  "version": "1.0.0"
-}
-```
+4. 手動で設定する場合は、`.env`と`mcp_settings.json`を編集:
+   - OpenAI APIキーを設定
+   - BlenderとUE5の実行ファイルパスを設定
+   - UE5プロジェクトパスを設定
 
 ## 使用方法
 
-### 1. MCPサーバーの起動
-
-MCPサーバーとモジュールを起動するには：
+### MCPシステムの起動
 
 ```bash
 python run_mcp.py all
 ```
 
-特定のモジュールのみ起動する場合：
+オプション:
+- `all`: すべてのコンポーネントを起動
+- `server`: サーバーのみ起動
+- `blender`: サーバーとBlender連携を起動
+- `ue5`: サーバーとUE5連携を起動
+
+### Web UIへのアクセス
+
+MCPサーバーが起動したら、ブラウザで以下のURLにアクセスします:
+```
+http://localhost:8080
+```
+
+### シューティングゲームの作成例
+
+1. UE5プロジェクトを新規作成
+2. MCPサーバーを起動
+3. Web UIから「シューティングゲーム生成」を選択
+4. 生成が完了したら、UE5エディタでプロジェクトを開く
+
+## Docker環境での実行
+
+MCPはDockerコンテナでも実行できます。これにより環境構築が簡単になります。
+
+### Dockerで実行
+
+1. Docker環境を構築:
+   ```bash
+   # イメージをビルドして実行
+   docker build -t mcp-server .
+   docker run -p 8080:8080 -v $(pwd)/exports:/app/exports -v $(pwd)/imports:/app/imports mcp-server
+   ```
+
+2. Docker Composeで実行（推奨）:
+   ```bash
+   # 環境変数を設定
+   echo "OPENAI_API_KEY=your_api_key_here" > .env.docker
+   
+   # Docker Composeで起動
+   docker-compose up -d
+   ```
+
+3. ブラウザで以下のURLにアクセス:
+   ```
+   http://localhost:8080
+   ```
+
+### APIキーの安全な設定
+
+セキュリティ上の理由から、APIキーはリポジトリに含めないでください。以下のスクリプトを使用して安全に設定できます:
 
 ```bash
-python run_mcp.py server  # サーバーのみ
-python run_mcp.py blender # サーバー + Blender連携
-python run_mcp.py ue5     # サーバー + UE5連携
+# APIキー設定ツールの実行
+python set_api_key.py
 ```
 
-### 2. 機能テスト
+## セキュリティ注意事項
 
-#### Blender-UE5連携テスト
-Blenderでモデルを作成してUE5に転送：
+- **APIキー**: `.env`ファイルに記載するAPIキーはGitHubにプッシュしないでください
+- **ローカル使用**: 基本的にローカルネットワークでの利用を推奨します
+- **パブリック公開**: インターネットに公開する場合は、適切なセキュリティ対策を施してください
 
-```bash
-python blender_to_ue5_asset.py
-```
+## ディレクトリ構造
 
-#### UE5ゲーム作成テスト
-シンプルな3Dアクションゲームの基本構造を作成：
-
-```bash
-python simple_ue5_game.py
-```
-
-#### AI駆動ゲーム開発アシスタント
-自然言語でUE5の機能を制御するインタラクティブアシスタントを起動：
-
-```bash
-python ai_ue5_assistant.py
-```
-
-### 3. ワークフロー実行
-
-統合ワークフローを実行するには：
-
-```bash
-# BlenderからUE5へのアセット転送ワークフロー
-python run_mcp_workflow.py blender_to_ue5
-
-# シンプルなUE5ゲーム作成ワークフロー
-python run_mcp_workflow.py simple_game
-
-# AI駆動ゲーム開発アシスタント
-python run_mcp_workflow.py ai_assistant
-```
-
-Blender内でスクリプトを実行する場合：
-
-```bash
-python run_mcp_workflow.py blender_to_ue5 --blender
-```
-
-UE5内でスクリプトを実行する場合：
-
-```bash
-python run_mcp_workflow.py simple_game --ue5
-```
-
-## Blender連携機能
-
-MCPは以下のBlender機能をサポートしています：
-
-- **自動モデル作成**: 基本形状、カスタム形状（剣など）の作成
-- **マテリアル適用**: 色、メタリック度、ラフネスなどのプロパティを設定
-- **モデルエクスポート**: FBX, OBJ, GLB形式でエクスポート
-- **UE5への転送**: モデルをUE5プロジェクトに自動転送
-
-Blender内での使用例：
-```python
-# Blenderエディタ内でスクリプトを実行
-from blender_integration import BlenderMCPIntegration
-
-integration = BlenderMCPIntegration()
-integration.create_simple_model("sword", "GameSword")
-integration.apply_material("GameSword", "MetalSwordMaterial", metallic=0.9)
-integration.send_to_ue5("GameSword", "fbx")
-```
-
-## UE5連携機能
-
-MCPは以下のUE5機能をサポートしています：
-
-- **レベル作成**: 様々なテンプレートからの新規レベル作成
-- **地形生成**: カスタマイズ可能な地形の自動生成
-- **Blueprint自動化**: AI駆動のBlueprint作成
-- **アセット管理**: インポート、配置、マテリアル設定
-- **ワークフロー自動化**: ライティングビルドなどの自動処理
-
-UE5内での使用例：
-```python
-# UE5エディタ内でスクリプトを実行
-from ue5_integration import UE5MCPIntegration
-
-integration = UE5MCPIntegration()
-integration.create_level("MCPTestLevel", "ThirdPerson")
-integration.generate_terrain(size_x=4096, terrain_type="mountainous")
-integration.create_blueprint("BP_CollectibleItem", "Actor", "収集可能なアイテム")
-```
-
-## AIアシスタント機能
-
-自然言語でUE5機能を制御するAIアシスタントを使用できます：
-
-- **コマンド変換**: 自然言語をUE5コマンドに変換
-- **コンテンツ生成**: キャラクター、ストーリー、ゲームコンセプトの生成
-- **問題解決**: ゲーム開発上の課題に対するAIアシスト
-
-使用例：
-```
-> コマンドを入力してください: 山と森のある大きなオープンワールドの地形を生成して
-
-🔍 '山と森のある大きなオープンワールドの地形を生成して' を解析しています...
-🚀 コマンド 'generate_terrain' を実行しています...
-✅ 成功: mountainous地形の生成が完了しました
-```
+- `blender_scripts/`: Blender連携スクリプト
+- `exports/`: Blenderからのエクスポートディレクトリ
+- `imports/`: UE5へのインポートディレクトリ
+- `assets/`: 共有アセット
+- `logs/`: ログファイル
+- `templates/`: WebUIテンプレート
 
 ## トラブルシューティング
 
-### サーバー接続エラー
-サーバー接続エラーが発生した場合は、サーバーが実行中かを確認し、ポート設定を確認してください：
-
-```bash
-# サーバー状態確認
-curl http://127.0.0.1:8000/api/status
-
-# 実行中のサーバープロセスを確認
-ps aux | grep run_mcp
-```
-
-### ポート競合
-ポートが既に使用されている場合は、設定ファイルで別のポートを指定するか、競合するプロセスを終了してください：
-
-```bash
-# 競合するプロセスの終了
-pkill -f "run_mcp.py"
-```
-
-### OpenAI APIエラー
-APIキーが正しく設定されていることを確認し、`.env`ファイルを確認してください。APIキーにスペースや改行がないことを確認してください。
-
-## 開発資料
-
-詳細なドキュメントは以下の資料を参照してください：
-
-- [アーキテクチャ](./architecture.md)
-- [Blender-MCP連携](./blender_mcp.md)
-- [UE5-MCP連携](./ue5_mcp.md)
-- [AI統合](./ai_integration.md)
-- [コマンドリファレンス](./commands.md)
-
-## ライセンス
-
-このプロジェクトは[MITライセンス](./LICENSE.md)の下で公開されています。
+- **Blender/UE5接続エラー**: 実行ファイルのパスが正しいか確認してください
+- **APIエラー**: OpenAI APIキーの有効性と制限を確認してください
+- **ポート競合**: 別のアプリケーションが同じポートを使用していないか確認してください
 
 ## 貢献
 
-プロジェクトへの貢献方法については[CONTRIBUTING.md](./CONTRIBUTING.md)を参照してください。
+貢献は歓迎します！以下の方法で参加できます:
+1. このリポジトリをフォーク
+2. 機能追加やバグ修正のブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Requestを作成
+
+## ライセンス
+
+[MIT](LICENSE)
+
+## 謝辞
+
+- OpenAI - GPT-4 API
+- Blender Foundation - Blender
+- Epic Games - Unreal Engine 5

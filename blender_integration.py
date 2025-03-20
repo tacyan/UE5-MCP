@@ -425,6 +425,19 @@ class BlenderMCPIntegration:
                 }
             )
             
+            # 404エラーが発生した場合は別のエンドポイントを試す
+            if response.status_code == 404:
+                response = requests.post(
+                    f"{self.server_url}/api/unreal/execute",
+                    json={
+                        "command": "import_asset",
+                        "params": {
+                            "path": export_path,
+                            "destination": f"/Game/Assets/{model_name}"
+                        }
+                    }
+                )
+            
             if response.status_code == 200:
                 result = response.json()
                 status = result.get("status", "unknown")

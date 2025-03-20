@@ -29,7 +29,7 @@ import signal
 import logging
 import json
 import platform
-import yaml
+from pathlib import Path
 from dotenv import load_dotenv
 
 # 環境変数のロード
@@ -56,70 +56,120 @@ logger = logging.getLogger("run_mcp")
 # プロセスリスト（終了時に全てを停止するために使用）
 processes = []
 
+def signal_handler(sig, frame):
+    """
+    シグナルハンドラ（Ctrl+Cで終了時に全プロセスを停止）
+    """
+    logger.info("終了シグナルを受信しました。すべてのプロセスを停止しています...")
+    for process in processes:
+        try:
+            if process.poll() is None:  # プロセスがまだ実行中
+                if IS_WINDOWS:
+                    process.kill()
+                else:
+                    process.terminate()
+                logger.info(f"プロセス (PID: {process.pid}) を停止しました")
+        except Exception as e:
+            logger.error(f"プロセス終了中にエラーが発生しました: {str(e)}")
+    
+    logger.info("MCPシステムを終了しました")
+    sys.exit(0)
+
 def load_config():
     """
-    設定ファイルを読み込む
+    設定ファイルをロードする
     
     戻り値:
         dict: 設定情報
     """
+    # 設定ファイルパス
+    config_path = os.path.join(os.getcwd(), "mcp_settings.json")
+    
     try:
-        # JSONファイルの優先度を高く設定
-        if os.path.exists('mcp_settings.json'):
+        if os.path.exists(config_path):
             logger.info("mcp_settings.json から設定を読み込みます")
-            with open('mcp_settings.json', 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-                server_config = settings.get('server', {})
-                blender_config = settings.get('modules', {}).get('blender', {})
-                unreal_config = settings.get('modules', {}).get('unreal', {})
-                
-                return {
-                    'server': {
-                        'host': server_config.get('host', '127.0.0.1'),
-                        'port': server_config.get('port', 5000),
-                        'debug': server_config.get('debug', False)
-                    },
-                    'blender': {
-                        'enabled': blender_config.get('enabled', True),
-                        'port': blender_config.get('port', 5001)
-                    },
-                    'unreal': {
-                        'enabled': unreal_config.get('enabled', True),
-                        'port': unreal_config.get('port', 5002)
-                    }
-                }
-        elif os.path.exists('config.yml'):
-            logger.info("config.yml から設定を読み込みます")
-            with open('config.yml', 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
+            with open(config_path, "r") as f:
+                config = json.load(f)
         else:
             logger.warning("設定ファイルが見つかりません。デフォルト設定を使用します。")
-            return {
-                'server': {
-                    'host': '127.0.0.1',
-                    'port': 5000,
-                    'debug': False
-                },
-                'blender': {
-                    'enabled': True,
-                    'port': 5001
-                },
-                'unreal': {
-                    'enabled': True,
-                    'port': 5002
-                }
+            config = {
+                "server": {"host": "127.0.0.1", "port": 8000},
+                "blender": {"enabled": True, "port": 9001},
+                "unreal": {"enabled": True, "port": 9002}
             }
     except Exception as e:
-        logger.error(f"設定ファイルの読み込み中にエラーが発生しました: {str(e)}")
-        sys.exit(1)
+        logger.error(f"設定ファイル読み込み中にエラーが発生しました: {str(e)}")
+        config = {
+            "server": {"host": "127.0.0.1", "port": 8000},
+            "blender": {"enabled": True, "port": 9001},
+            "unreal": {"enabled": True, "port": 9002}
+        }
+    
+    return config
+
+def print_system_info():
+    """
+    システム情報を表示する
+    """
+    logger.info("=== MCP システム情報 ===")
+    logger.info(f"OS: {platform.system()} ({platform.platform()})")
+    logger.info(f"Python: {platform.python_version()}")
+    
+    # 設定情報を表示
+    config = load_config()
+    server_host = config.get("server", {}).get("host", "127.0.0.1")
+    server_port = config.get("server", {}).get("port", 8000)
+    logger.info(f"MCPサーバー: http://{server_host}:{server_port}")
+    
+    blender_port = config.get("blender", {}).get("port", 9001)
+    logger.info(f"Blender-MCP: http://{server_host}:{blender_port}")
+    
+    ue5_port = config.get("unreal", {}).get("port", 9002)
+    logger.info(f"UE5-MCP: http://{server_host}:{ue5_port}")
+    
+    # OpenAI API設定を確認
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        masked_key = f"{api_key[:5]}...{api_key[-5:]}" if len(api_key) > 10 else "***"
+        logger.info(f"OpenAI API: 設定済み")
+    else:
+        logger.warning("OpenAI API: 未設定")
+    
+    logger.info("========================")
+
+def check_port_availability(port):
+    """
+    指定されたポートが使用可能かどうかを確認する
+    
+    引数:
+        port (int): チェックするポート番号
+        
+    戻り値:
+        bool: ポートが使用可能ならTrue、そうでなければFalse
+    """
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    result = sock.connect_ex(('127.0.0.1', port))
+    sock.close()
+    return result != 0  # 0なら接続可能＝使用中
 
 def run_server():
     """
     MCPサーバーを起動する
     """
+    # 設定を取得
+    config = load_config()
+    server_port = config.get("server", {}).get("port", 8000)
+    
+    # ポートの空き状況をチェック
+    if not check_port_availability(server_port):
+        logger.warning(f"ポート {server_port} はすでに使用されています。サーバーはすでに実行中の可能性があります。")
+        return None
+    
     logger.info("MCPサーバーを起動します...")
     try:
-        process = subprocess.Popen([PYTHON_CMD, 'server.py'])
+        process = subprocess.Popen([PYTHON_CMD, 'mcp_server.py'])
         processes.append(process)
         logger.info(f"MCPサーバーが起動しました (PID: {process.pid})")
         # サーバーが起動するまで少し待機
@@ -133,9 +183,23 @@ def run_blender_mcp():
     """
     Blender-MCPを起動する
     """
+    # 設定を取得
+    config = load_config()
+    blender_port = config.get("blender", {}).get("port", 9001)
+    
+    # ポートの空き状況をチェック
+    if not check_port_availability(blender_port):
+        logger.warning(f"ポート {blender_port} はすでに使用されています。Blender-MCPはすでに実行中の可能性があります。")
+        return None
+    
     logger.info("Blender-MCPを起動します...")
     try:
-        process = subprocess.Popen([PYTHON_CMD, 'blender_mcp.py'])
+        # Blender起動スクリプトの有無を確認
+        blender_script = "blender_mcp.py"
+        if not os.path.exists(blender_script):
+            blender_script = "blender_integration.py"
+            
+        process = subprocess.Popen([PYTHON_CMD, blender_script])
         processes.append(process)
         logger.info(f"Blender-MCPが起動しました (PID: {process.pid})")
         return process
@@ -147,9 +211,25 @@ def run_ue5_mcp():
     """
     UE5-MCPを起動する
     """
+    # 設定を取得
+    config = load_config()
+    ue5_port = config.get("unreal", {}).get("port", 9002)
+    
+    # ポートの空き状況をチェック
+    if not check_port_availability(ue5_port):
+        logger.warning(f"ポート {ue5_port} はすでに使用されています。UE5-MCPはすでに実行中の可能性があります。")
+        return None
+    
     logger.info("UE5-MCPを起動します...")
     try:
-        process = subprocess.Popen([PYTHON_CMD, 'ue5_mcp.py'])
+        # UE5起動スクリプトの有無を確認
+        ue5_script = "ue5_mcp.py"
+        if not os.path.exists(ue5_script):
+            ue5_plugin_dir = Path("ue5_plugin")
+            if ue5_plugin_dir.exists() and (ue5_plugin_dir / "mcp_plugin.py").exists():
+                ue5_script = str(ue5_plugin_dir / "mcp_plugin.py")
+        
+        process = subprocess.Popen([PYTHON_CMD, ue5_script])
         processes.append(process)
         logger.info(f"UE5-MCPが起動しました (PID: {process.pid})")
         return process
@@ -157,72 +237,18 @@ def run_ue5_mcp():
         logger.error(f"UE5-MCPの起動中にエラーが発生しました: {str(e)}")
         return None
 
-def signal_handler(sig, frame):
+def ensure_directories():
     """
-    シグナルハンドラ（Ctrl+Cなどで終了時に呼ばれる）
+    必要なディレクトリを作成する
     """
-    logger.info("終了シグナルを受信しました。すべてのプロセスを停止します...")
-    for process in processes:
-        try:
-            logger.info(f"プロセス {process.pid} を停止します...")
-            process.terminate()
-        except:
-            pass
+    dirs = [
+        "assets", "temp", "logs", "exports", "imports", 
+        "blender_scripts", "ue5_scripts"
+    ]
     
-    # プロセスが終了するまで少し待機
-    time.sleep(1)
-    
-    # 終了していないプロセスを強制終了
-    for process in processes:
-        if process.poll() is None:
-            try:
-                logger.info(f"プロセス {process.pid} を強制終了します...")
-                process.kill()
-            except:
-                pass
-    
-    logger.info("すべてのプロセスが停止しました。")
-    sys.exit(0)
-
-def print_system_info():
-    """
-    システム情報を表示する
-    """
-    logger.info("=== MCP システム情報 ===")
-    
-    # OS情報
-    logger.info(f"OS: {platform.system()} ({platform.platform()})")
-    logger.info(f"Python: {platform.python_version()}")
-    
-    config = load_config()
-    
-    # MCPサーバー情報
-    server_host = config['server']['host']
-    server_port = config['server']['port']
-    logger.info(f"MCPサーバー: http://{server_host}:{server_port}")
-    
-    # Blender-MCP情報
-    if config['blender']['enabled']:
-        blender_port = config['blender']['port']
-        logger.info(f"Blender-MCP: http://{server_host}:{blender_port}")
-    else:
-        logger.info("Blender-MCP: 無効")
-    
-    # UE5-MCP情報
-    if config['unreal']['enabled']:
-        ue5_port = config['unreal']['port']
-        logger.info(f"UE5-MCP: http://{server_host}:{ue5_port}")
-    else:
-        logger.info("UE5-MCP: 無効")
-    
-    # AI状態の確認
-    ai_key = os.environ.get('OPENAI_API_KEY')
-    if ai_key:
-        logger.info("OpenAI API: 設定済み")
-    else:
-        logger.info("OpenAI API: 未設定（モックモードで動作します）")
-    
-    logger.info("========================")
+    for dir_name in dirs:
+        os.makedirs(dir_name, exist_ok=True)
+        logger.debug(f"ディレクトリを確認: {dir_name}")
 
 def main():
     """
@@ -249,34 +275,27 @@ def main():
     # 設定のロード
     config = load_config()
     
+    # 必要なディレクトリの作成
+    ensure_directories()
+    
     # サーバーを起動（すべてのモードで必要）
     server_process = run_server()
-    if not server_process:
-        sys.exit(1)
     
     # モードに応じて追加のコンポーネントを起動
-    if args.mode in ['all', 'blender'] and config['blender']['enabled']:
+    if args.mode in ['all', 'blender'] and config.get('blender', {}).get('enabled', True):
         blender_process = run_blender_mcp()
-        if not blender_process and args.mode == 'blender':
-            logger.error("Blender-MCPの起動に失敗しました。")
-            signal_handler(None, None)
-            sys.exit(1)
     
-    if args.mode in ['all', 'ue5'] and config['unreal']['enabled']:
+    if args.mode in ['all', 'ue5'] and config.get('unreal', {}).get('enabled', True):
         ue5_process = run_ue5_mcp()
-        if not ue5_process and args.mode == 'ue5':
-            logger.error("UE5-MCPの起動に失敗しました。")
-            signal_handler(None, None)
-            sys.exit(1)
     
     # 使い方の表示
     logger.info(f"MCPシステムが起動しました（モード: {args.mode}）")
     logger.info("Ctrl+C で終了")
     
-    # すべてのプロセスが終了するまで待機
+    # プロセスが終了しないように待機
     try:
-        for process in processes:
-            process.wait()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         signal_handler(None, None)
 

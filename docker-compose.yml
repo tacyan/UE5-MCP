@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # MCPサーバー
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./exports:/app/exports
+      - ./imports:/app/imports
+      - ./logs:/app/logs
+      - ./assets:/app/assets
+      - ./temp:/app/temp
+    environment:
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8080
+      - DEBUG=false
+      - BLENDER_ENABLED=true
+      - BLENDER_PORT=8081
+      - UE5_ENABLED=true
+      - UE5_PORT=8082
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - mcp-network
+    command: server
+
+  # Blenderサービス（オプション - 外部Blenderインスタンスと連携する場合はコメントアウト）
+  # mcp-blender:
+  #   image: nytimes/blender:3.6.0
+  #   container_name: mcp-blender
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9081:9081"
+  #   volumes:
+  #     - ./blender_scripts:/app/blender_scripts
+  #     - ./exports:/app/exports
+  #   environment:
+  #     - BLENDER_MCP_PORT=9081
+  #     - MCP_SERVER_HOST=mcp-server
+  #     - MCP_SERVER_PORT=8080
+  #   networks:
+  #     - mcp-network
+  #   depends_on:
+  #     - mcp-server
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  exports:
+  imports:
+  logs:
+  assets:
+  temp: 

@@ -1,3 +1,33 @@
+# 個人情報や環境固有の設定
+.env
+.env.*
+mcp_settings.json
+*.log
+credentials.json
+set_api_key.py
+
+# エクスポート・インポートディレクトリ
+exports/
+imports/
+temp/
+logs/
+assets/
+
+# Blenderの一時ファイル
+*.blend1
+blender_scripts/*.py
+*.blend.tmp
+*.blend.lock
+
+# UE5関連
+Saved/
+Intermediate/
+Binaries/
+DerivedDataCache/
+*.uasset.tmp
+*.ubulk.tmp
+*.umap.tmp
+
 # Python関連
 __pycache__/
 *.py[cod]
@@ -16,9 +46,42 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# macOS関連
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows関連
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# VSCode関連
+.vscode/
+*.code-workspace
+.history/
+
+# OpenAI APIキー関連
+*api_key*
+*apikey*
+*secret*
+*password*
+*credential*
 
 # 環境変数
 .env
@@ -34,8 +97,17 @@ exports/
 ue5_mcp_config.yml
 blender_mcp_config.yml
 mcp_settings.json
+.env.*
+mcp_settings.json.backup
+
+# Docker関連
+.dockerignore
+docker-compose.override.yml
 
 # 一時ファイル
+*.swp
+*.swo
+*~
 .DS_Store
 .vscode/
 .idea/
@@ -47,6 +119,7 @@ mcp_settings.json
 *.fbx
 *.obj
 *.gltf
+*.glb
 *.png
 *.jpg
 *.jpeg

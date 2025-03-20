@@ -1,32 +1,36 @@
 {
   "server": {
-    "host": "127.0.0.1",
-    "port": 8000,
+    "host": "0.0.0.0",
+    "port": 8080,
     "debug": false
-  },
-  "modules": {
-    "blender": {
-      "enabled": true,
-      "port": 8001,
-      "path": "/path/to/blender",
-      "autostart": true
-    },
-    "unreal": {
-      "enabled": true,
-      "port": 8002,
-      "path": "/path/to/unreal/editor",
-      "autostart": true
-    }
   },
   "ai": {
     "provider": "openai",
-    "model": "gpt-4",
-    "temperature": 0.7
+    "model": "gpt-4-turbo",
+    "api_key": "",
+    "temperature": 0.7,
+    "max_tokens": 2048
+  },
+  "blender": {
+    "enabled": true,
+    "path": "/path/to/your/blender/executable",
+    "port": 9081,
+    "python_path": "",
+    "export_dir": "./exports",
+    "script_dir": "./blender_scripts"
+  },
+  "unreal": {
+    "enabled": true,
+    "path": "/path/to/your/unrealEditor/executable",
+    "port": 9082,
+    "project_path": "/path/to/your/project.uproject",
+    "import_dir": "./imports",
+    "python_path": ""
   },
   "paths": {
-    "blender": "",
-    "unreal": "",
-    "exports": "./exports"
+    "assets": "./assets",
+    "temp": "./temp",
+    "logs": "./logs"
   },
   "logging": {
     "level": "info",
