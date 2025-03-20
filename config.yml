@@ -1,0 +1,29 @@
+# MCP設定ファイル
+# MCPサーバー、Blender-MCP、UE5-MCPの設定
+
+# MCPサーバー設定
+server:
+  host: 127.0.0.1  # サーバーのホスト
+  port: 5000       # サーバーのポート
+  debug: false     # デバッグモード
+
+# AI設定
+ai:
+  provider: mock     # AIプロバイダー (openai または mock)
+  model: gpt-4        # 使用するモデル
+  api_key: ${OPENAI_API_KEY}  # 環境変数から取得（未設定の場合はmockモードが自動的に使用されます）
+
+# Blender設定
+blender:
+  enabled: true  # Blender-MCPを有効にする
+  port: 5001     # Blender-MCPのポート
+
+# Unreal Engine 5設定
+unreal:
+  enabled: true  # UE5-MCPを有効にする
+  port: 5002     # UE5-MCPのポート
+
+# ログ設定
+logging:
+  level: info
+  file: mcp.log 

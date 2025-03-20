@@ -1,0 +1,53 @@
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 環境変数
+.env
+
+# ログファイル
+*.log
+logs/
+
+# エクスポートディレクトリ
+exports/
+
+# 設定ファイル
+ue5_mcp_config.yml
+blender_mcp_config.yml
+
+# 一時ファイル
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 生成されたアセットファイル
+*.fbx
+*.obj
+*.gltf
+*.png
+*.jpg
+*.jpeg
+*.exr
+*.hdr 
