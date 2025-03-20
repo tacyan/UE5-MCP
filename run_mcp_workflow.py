@@ -2,354 +2,397 @@
 # -*- coding: utf-8 -*-
 
 """
-MCP統合ワークフロー実行スクリプト
+MCP連携ワークフロー実行スクリプト
 
-このスクリプトは、MCPサーバーを起動し、BlenderとUE5を連携した
-ワークフローを実行するためのものです。OpenAI APIを使用して
-AIドリブンの開発を行います。
+このスクリプトは、MCPフレームワークを使用してBlenderとUE5を連携させ、
+様々なワークフローを実行します。コマンドライン引数によって異なる
+ワークフローを選択できます。
 
-主な機能:
-- MCPサーバーの起動
-- Blenderで3Dモデルを作成してUE5に転送
-- UE5でゲームプロジェクトの作成
-- AIを活用したゲーム開発支援
+主なワークフロー:
+- blender_to_ue5: BlenderからUE5へのアセット転送
+- treasure_hunt: トレジャーハントゲームの作成
+- robot_game: ロボットゲームの作成
 
 使用方法:
-    python run_mcp_workflow.py [workflow]
-    
-    workflow: 実行するワークフロー (blender_to_ue5, simple_game, ai_assistant)
+python run_mcp_workflow.py <ワークフロー名> [--blender] [--ue5]
 
-制限事項:
-- Blender 4.0以上およびUE5.1以上が必要です
-- OpenAI APIキーが設定されている必要があります
+オプション:
+--blender: Blenderでスクリプトを実行する
+--ue5: UE5でスクリプトを実行する
 """
 
 import os
 import sys
-import subprocess
+import logging
 import argparse
 import time
-import logging
-import json
-import platform
-from dotenv import load_dotenv
-
-# 環境変数のロード
-load_dotenv()
+import subprocess
 
 # ロギングの設定
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("workflow.log"),
+        logging.FileHandler("mcp_workflow.log"),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("mcp_workflow")
 
-# OSの検出
-IS_WINDOWS = platform.system() == "Windows"
-IS_MAC = platform.system() == "Darwin"
-IS_LINUX = platform.system() == "Linux"
-
-# Pythonコマンドの設定
-PYTHON_CMD = "python" if IS_WINDOWS else "python3"
-
-# プロセスリスト（終了時に全てを停止するために使用）
-processes = []
-
-def ensure_mcp_server_running():
+def is_mcp_server_running():
     """
-    MCPサーバーを起動する
+    MCPサーバーが実行中かどうかをチェックする
     
     戻り値:
-        bool: 起動成功したかどうか
+        bool: サーバーが実行中ならTrue、そうでなければFalse
     """
-    logger.info("MCPサーバーの状態を確認しています...")
-    
-    # すでに起動しているかをチェック
     try:
-        # 設定を読み込み
-        with open('mcp_settings.json', 'r', encoding='utf-8') as f:
-            settings = json.load(f)
-        
-        server_host = settings.get('server', {}).get('host', '127.0.0.1')
-        server_port = settings.get('server', {}).get('port', 8000)
-        
-        # サーバーに接続を試みる
         import requests
-        response = requests.get(f"http://{server_host}:{server_port}/status", timeout=2)
-        
+        response = requests.get("http://127.0.0.1:8000/api/status", timeout=2)
         if response.status_code == 200:
-            status_data = response.json()
-            if status_data.get("status") == "running":
-                logger.info("MCPサーバーはすでに起動しています")
-                return True
+            data = response.json()
+            return data.get("status") == "running"
+        return False
     except:
-        pass
+        return False
+
+def start_mcp_server():
+    """
+    MCPサーバーを起動する
+    """
+    logger.info("MCPサーバーを起動しています...")
     
-    # サーバーが起動していないので起動
-    logger.info("MCPサーバーを起動します...")
+    # すでに実行中の場合は何もしない
+    if is_mcp_server_running():
+        logger.info("MCPサーバーはすでに実行中です")
+        return True
+    
     try:
-        # サーバープロセスを開始（バックグラウンドで実行）
-        process = subprocess.Popen([PYTHON_CMD, 'run_mcp.py', 'all'])
-        processes.append(process)
+        # バックグラウンドでサーバーを起動
+        process = subprocess.Popen(
+            ["python", "run_mcp.py", "all"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         
-        # サーバーが起動するまで少し待機
-        time.sleep(5)
-        logger.info(f"MCPサーバーを起動しました (PID: {process.pid})")
+        # サーバーの起動を待つ
+        for _ in range(10):  # 最大10秒間待機
+            time.sleep(1)
+            if is_mcp_server_running():
+                logger.info("MCPサーバーが正常に起動しました")
+                return True
         
-        # 再度接続を試みる
-        try:
-            response = requests.get(f"http://{server_host}:{server_port}/status", timeout=2)
-            if response.status_code == 200:
-                status_data = response.json()
-                if status_data.get("status") == "running":
-                    logger.info("MCPサーバーは正常に起動しています")
-                    return True
-        except:
-            pass
-        
-        logger.error("MCPサーバーの起動後に接続できませんでした")
+        logger.error("MCPサーバーの起動がタイムアウトしました")
         return False
     except Exception as e:
         logger.error(f"MCPサーバーの起動中にエラーが発生しました: {str(e)}")
         return False
 
-def run_blender_to_ue5_workflow():
+def run_blender_direct_script():
     """
-    BlenderからUE5へのワークフローを実行する
-    
-    戻り値:
-        bool: 成功したかどうか
+    Blenderでゲームオブジェクト作成スクリプトを実行する
     """
-    logger.info("BlenderからUE5へのアセット転送ワークフローを実行します...")
+    logger.info("Blenderでゲームオブジェクト作成スクリプトを実行...")
     
     try:
-        # blender_to_ue5_asset.pyスクリプトを実行
-        command = [PYTHON_CMD, 'blender_to_ue5_asset.py']
-        logger.info(f"コマンドを実行: {' '.join(command)}")
+        # 環境変数から取得したBlenderパス
+        blender_path = os.environ.get("BLENDER_PATH", "blender")
         
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # スクリプトをBlenderで実行
+        process = subprocess.Popen(
+            [blender_path, "--background", "--python", "blender_direct_script.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         
-        if result.returncode == 0:
-            logger.info("ワークフローは正常に完了しました")
-            logger.info(f"出力:\n{result.stdout}")
+        stdout, stderr = process.communicate()
+        
+        if process.returncode == 0:
+            logger.info("Blenderスクリプトが正常に完了しました")
+            logger.debug(stdout.decode())
             return True
         else:
-            logger.error(f"ワークフロー実行中にエラーが発生しました: {result.stderr}")
+            logger.error(f"Blenderスクリプトの実行中にエラーが発生しました: {stderr.decode()}")
             return False
     except Exception as e:
-        logger.exception(f"ワークフロー実行中に例外が発生しました: {str(e)}")
+        logger.error(f"Blenderスクリプト実行中に例外が発生しました: {str(e)}")
         return False
 
-def run_simple_game_workflow():
+def run_ue5_treasure_game():
     """
-    シンプルなゲーム作成ワークフローを実行する
-    
-    戻り値:
-        bool: 成功したかどうか
+    UE5でトレジャーハントゲームを作成する
     """
-    logger.info("シンプルなゲーム作成ワークフローを実行します...")
+    logger.info("UE5でトレジャーハントゲームを作成...")
     
     try:
-        # simple_ue5_game.pyスクリプトを実行
-        command = [PYTHON_CMD, 'simple_ue5_game.py']
-        logger.info(f"コマンドを実行: {' '.join(command)}")
+        # スクリプトを実行
+        process = subprocess.Popen(
+            ["python", "ue5_treasure_game.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate()
         
-        if result.returncode == 0:
-            logger.info("ワークフローは正常に完了しました")
-            logger.info(f"出力:\n{result.stdout}")
+        if process.returncode == 0:
+            logger.info("UE5ゲーム作成スクリプトが正常に完了しました")
             return True
         else:
-            logger.error(f"ワークフロー実行中にエラーが発生しました: {result.stderr}")
+            logger.error(f"UE5ゲーム作成中にエラーが発生しました: {stderr.decode()}")
             return False
     except Exception as e:
-        logger.exception(f"ワークフロー実行中に例外が発生しました: {str(e)}")
+        logger.error(f"UE5ゲーム作成中に例外が発生しました: {str(e)}")
         return False
+
+def run_robot_game():
+    """
+    ロボットゲームを作成する
+    """
+    logger.info("ロボットゲームを作成...")
+    
+    try:
+        # スクリプトを実行
+        process = subprocess.Popen(
+            ["python", "create_player_character.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        stdout, stderr = process.communicate()
+        
+        if process.returncode == 0:
+            logger.info("ロボットゲーム作成スクリプトが正常に完了しました")
+            return True
+        else:
+            logger.error(f"ロボットゲーム作成中にエラーが発生しました: {stderr.decode()}")
+            return False
+    except Exception as e:
+        logger.error(f"ロボットゲーム作成中に例外が発生しました: {str(e)}")
+        return False
+
+def run_ai_assistant():
+    """
+    AIアシスタントを実行する
+    """
+    logger.info("AIアシスタントを起動...")
+    
+    try:
+        # スクリプトを実行
+        process = subprocess.Popen(
+            ["python", "ai_ue5_assistant.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        stdout, stderr = process.communicate()
+        
+        if process.returncode == 0:
+            logger.info("AIアシスタントが正常に完了しました")
+            return True
+        else:
+            logger.error(f"AIアシスタント実行中にエラーが発生しました: {stderr.decode()}")
+            return False
+    except Exception as e:
+        logger.error(f"AIアシスタント実行中に例外が発生しました: {str(e)}")
+        return False
+
+def run_ue5_standalone(workflow_name):
+    """
+    UE5単独でワークフローを実行する
+    
+    引数:
+        workflow_name (str): 実行するワークフロー名
+    """
+    logger.info(f"UE5内でワークフロー '{workflow_name}' を実行...")
+    
+    try:
+        # 環境変数から取得したUE5エディタパス
+        ue5_path = os.environ.get("UE5_PATH", "UnrealEditor")
+        
+        # UE5プロジェクトパス（実際の環境に合わせて調整が必要）
+        ue5_project = os.environ.get("UE5_PROJECT", "./MyProject/MyProject.uproject")
+        
+        # Python スクリプトパス
+        if workflow_name == "treasure_hunt":
+            script_path = os.path.abspath("ue5_treasure_game.py")
+        elif workflow_name == "robot_game":
+            script_path = os.path.abspath("create_player_character.py")
+        else:
+            logger.error(f"未知のワークフロー: {workflow_name}")
+            return False
+        
+        # UE5エディタでスクリプトを実行
+        cmd = [
+            ue5_path,
+            ue5_project,
+            "-ExecutePythonScript=" + script_path
+        ]
+        
+        logger.info(f"コマンド実行: {' '.join(cmd)}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # この場合は非同期で実行するため、プロセスを待機しない
+        logger.info("UE5エディタを起動しました。スクリプトはエディタ内で実行されます。")
+        return True
+    except Exception as e:
+        logger.error(f"UE5実行中に例外が発生しました: {str(e)}")
+        return False
+
+def run_blender_standalone(workflow_name):
+    """
+    Blender単独でワークフローを実行する
+    
+    引数:
+        workflow_name (str): 実行するワークフロー名
+    """
+    logger.info(f"Blender内でワークフロー '{workflow_name}' を実行...")
+    
+    try:
+        # 環境変数から取得したBlenderパス
+        blender_path = os.environ.get("BLENDER_PATH", "blender")
+        
+        # スクリプトパス
+        if workflow_name == "blender_to_ue5":
+            script_path = os.path.abspath("blender_direct_script.py")
+        else:
+            logger.error(f"未知のワークフロー: {workflow_name}")
+            return False
+        
+        # Blenderを起動してスクリプトを実行
+        cmd = [
+            blender_path,
+            "-P", script_path
+        ]
+        
+        logger.info(f"コマンド実行: {' '.join(cmd)}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # この場合は非同期で実行するため、プロセスを待機しない
+        logger.info("Blenderを起動しました。スクリプトはBlender内で実行されます。")
+        return True
+    except Exception as e:
+        logger.error(f"Blender実行中に例外が発生しました: {str(e)}")
+        return False
+
+def run_blender_to_ue5_workflow():
+    """
+    BlenderからUE5へのアセット転送ワークフローを実行する
+    """
+    logger.info("=== BlenderからUE5へのアセット転送ワークフロー開始 ===")
+    
+    # 1. MCPサーバーが実行中か確認し、必要なら起動
+    if not start_mcp_server():
+        logger.error("MCPサーバーが起動できませんでした。処理を中止します。")
+        return False
+    
+    # 2. Blenderでゲームオブジェクト作成
+    if not run_blender_direct_script():
+        logger.error("Blenderスクリプトの実行に失敗しました。処理を中止します。")
+        return False
+    
+    # 3. UE5でトレジャーハントゲーム作成
+    if not run_ue5_treasure_game():
+        logger.error("UE5ゲーム作成に失敗しました。")
+        return False
+    
+    logger.info("=== BlenderからUE5へのアセット転送ワークフロー完了 ===")
+    return True
+
+def run_treasure_hunt_workflow():
+    """
+    トレジャーハントゲーム作成ワークフローを実行する
+    """
+    logger.info("=== トレジャーハントゲーム作成ワークフロー開始 ===")
+    
+    # 1. MCPサーバーが実行中か確認し、必要なら起動
+    if not start_mcp_server():
+        logger.error("MCPサーバーが起動できませんでした。処理を中止します。")
+        return False
+    
+    # 2. UE5でトレジャーハントゲーム作成
+    if not run_ue5_treasure_game():
+        logger.error("UE5ゲーム作成に失敗しました。")
+        return False
+    
+    logger.info("=== トレジャーハントゲーム作成ワークフロー完了 ===")
+    return True
+
+def run_robot_game_workflow():
+    """
+    ロボットゲーム作成ワークフローを実行する
+    """
+    logger.info("=== ロボットゲーム作成ワークフロー開始 ===")
+    
+    # 1. MCPサーバーが実行中か確認し、必要なら起動
+    if not start_mcp_server():
+        logger.error("MCPサーバーが起動できませんでした。処理を中止します。")
+        return False
+    
+    # 2. ロボットゲーム作成
+    if not run_robot_game():
+        logger.error("ロボットゲーム作成に失敗しました。")
+        return False
+    
+    logger.info("=== ロボットゲーム作成ワークフロー完了 ===")
+    return True
 
 def run_ai_assistant_workflow():
     """
-    AI駆動UE5ゲーム開発アシスタントを実行する
-    
-    戻り値:
-        bool: 成功したかどうか
+    AIアシスタントワークフローを実行する
     """
-    logger.info("AI駆動UE5ゲーム開発アシスタントを起動します...")
+    logger.info("=== AIアシスタントワークフロー開始 ===")
     
-    try:
-        # ai_ue5_assistant.pyスクリプトを実行（対話モードのため、直接実行して制御を移す）
-        command = [PYTHON_CMD, 'ai_ue5_assistant.py']
-        logger.info(f"コマンドを実行: {' '.join(command)}")
-        
-        # サブプロセスを直接実行（制御を移す）
-        return subprocess.call(command) == 0
-    except Exception as e:
-        logger.exception(f"AIアシスタント実行中に例外が発生しました: {str(e)}")
-        return False
-
-def run_on_blender(script_path):
-    """
-    指定されたスクリプトをBlenderで実行する
-    
-    引数:
-        script_path (str): 実行するスクリプトのパス
-        
-    戻り値:
-        bool: 成功したかどうか
-    """
-    logger.info(f"Blenderで{script_path}を実行します...")
-    
-    try:
-        # Blenderのパスを取得
-        blender_path = os.environ.get('BLENDER_PATH')
-        if not blender_path:
-            blender_path = "/Applications/Blender.app/Contents/MacOS/Blender" if IS_MAC else "blender"
-        
-        # Blenderを起動し、スクリプトを実行
-        command = [blender_path, "--background", "--python", script_path]
-        logger.info(f"コマンドを実行: {' '.join(command)}")
-        
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
-        if result.returncode == 0:
-            logger.info("Blenderスクリプトは正常に完了しました")
-            logger.info(f"出力:\n{result.stdout}")
-            return True
-        else:
-            logger.error(f"Blenderスクリプト実行中にエラーが発生しました: {result.stderr}")
-            return False
-    except Exception as e:
-        logger.exception(f"Blenderスクリプト実行中に例外が発生しました: {str(e)}")
-        return False
-
-def run_on_ue5(script_path):
-    """
-    指定されたスクリプトをUE5で実行する
-    
-    引数:
-        script_path (str): 実行するスクリプトのパス
-        
-    戻り値:
-        bool: 成功したかどうか
-    """
-    logger.info(f"UE5で{script_path}を実行します...")
-    
-    try:
-        # UE5のパスを取得
-        ue5_path = os.environ.get('UE5_PATH')
-        if not ue5_path:
-            ue5_path = "/Applications/Epic Games/UE_5.5/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" if IS_MAC else "UnrealEditor"
-        
-        # プロジェクトパスを指定（適切なプロジェクトパスに変更する必要があります）
-        project_path = os.path.join(os.getcwd(), "MyProject", "MyProject.uproject")
-        
-        # UE5を起動し、スクリプトを実行
-        command = [ue5_path, project_path, "-ExecutePythonScript", script_path]
-        logger.info(f"コマンドを実行: {' '.join(command)}")
-        
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
-        if result.returncode == 0:
-            logger.info("UE5スクリプトは正常に完了しました")
-            logger.info(f"出力:\n{result.stdout}")
-            return True
-        else:
-            logger.error(f"UE5スクリプト実行中にエラーが発生しました: {result.stderr}")
-            return False
-    except Exception as e:
-        logger.exception(f"UE5スクリプト実行中に例外が発生しました: {str(e)}")
-        return False
-
-def check_openai_api_key():
-    """
-    OpenAI APIキーが設定されているかを確認する
-    
-    戻り値:
-        bool: 設定されているかどうか
-    """
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        logger.error("OpenAI APIキーが設定されていません。.envファイルにOPENAI_API_KEYを設定してください。")
+    # 1. MCPサーバーが実行中か確認し、必要なら起動
+    if not start_mcp_server():
+        logger.error("MCPサーバーが起動できませんでした。処理を中止します。")
         return False
     
-    # キーの形式を簡易的にチェック
-    if not api_key.startswith('sk-'):
-        logger.warning("OpenAI APIキーの形式が不正な可能性があります。'sk-'で始まる文字列であるべきです。")
+    # 2. AIアシスタント実行
+    if not run_ai_assistant():
+        logger.error("AIアシスタント実行に失敗しました。")
+        return False
     
-    logger.info("OpenAI APIキーが設定されています")
+    logger.info("=== AIアシスタントワークフロー完了 ===")
     return True
 
 def main():
     """
     メイン関数
     """
-    parser = argparse.ArgumentParser(description='MCPワークフロー実行ツール')
-    parser.add_argument('workflow', nargs='?', default='simple_game',
-                        choices=['blender_to_ue5', 'simple_game', 'ai_assistant'],
-                        help='実行するワークフロー（blender_to_ue5, simple_game, ai_assistant）')
-    parser.add_argument('--blender', action='store_true',
-                        help='スクリプトをBlender内で実行する')
-    parser.add_argument('--ue5', action='store_true',
-                        help='スクリプトをUE5内で実行する')
+    # コマンドライン引数のパース
+    parser = argparse.ArgumentParser(description="MCPワークフロー実行スクリプト")
+    parser.add_argument("workflow", choices=["blender_to_ue5", "treasure_hunt", "robot_game", "ai_assistant"],
+                       help="実行するワークフロー名")
+    parser.add_argument("--blender", action="store_true", help="Blenderでスクリプトを実行する")
+    parser.add_argument("--ue5", action="store_true", help="UE5でスクリプトを実行する")
+    
     args = parser.parse_args()
     
-    # OpenAI APIキーのチェック
-    if not check_openai_api_key():
-        return 1
-    
-    # MCPサーバーの起動確認
-    if not ensure_mcp_server_running():
-        logger.error("MCPサーバーの起動に失敗しました。先に別ターミナルで `python run_mcp.py all` を実行してください。")
-        return 1
-    
-    # ワークフロー実行前のメッセージ
-    logger.info(f"'{args.workflow}' ワークフローを実行します...")
-    
-    # ワークフロー実行
-    success = False
-    
-    if args.workflow == 'blender_to_ue5':
+    try:
+        # Blenderモードでの実行
         if args.blender:
-            success = run_on_blender('blender_integration.py')
-        else:
-            success = run_blender_to_ue5_workflow()
-    
-    elif args.workflow == 'simple_game':
+            return run_blender_standalone(args.workflow)
+        
+        # UE5モードでの実行
         if args.ue5:
-            success = run_on_ue5('ue5_integration.py')
+            return run_ue5_standalone(args.workflow)
+        
+        # 通常実行
+        if args.workflow == "blender_to_ue5":
+            return run_blender_to_ue5_workflow()
+        elif args.workflow == "treasure_hunt":
+            return run_treasure_hunt_workflow()
+        elif args.workflow == "robot_game":
+            return run_robot_game_workflow()
+        elif args.workflow == "ai_assistant":
+            return run_ai_assistant_workflow()
         else:
-            success = run_simple_game_workflow()
-    
-    elif args.workflow == 'ai_assistant':
-        success = run_ai_assistant_workflow()
-    
-    # 実行結果を表示
-    if success:
-        logger.info(f"{args.workflow} ワークフローは正常に完了しました")
-        return 0
-    else:
-        logger.error(f"{args.workflow} ワークフローの実行中にエラーが発生しました")
-        return 1
+            logger.error(f"未知のワークフロー: {args.workflow}")
+            return False
+    except Exception as e:
+        logger.exception(f"ワークフロー実行中に予期しないエラーが発生しました: {str(e)}")
+        return False
 
 if __name__ == "__main__":
-    try:
-        exit_code = main()
-        sys.exit(exit_code)
-    except KeyboardInterrupt:
-        logger.info("ユーザーによって処理が中断されました")
-        
-        # 起動したプロセスを全て停止
-        for process in processes:
-            try:
-                process.terminate()
-            except:
-                pass
-        
-        sys.exit(1)
-    except Exception as e:
-        logger.exception(f"予期しないエラーが発生しました: {str(e)}")
-        sys.exit(1) 
+    result = main()
+    sys.exit(0 if result else 1) 
