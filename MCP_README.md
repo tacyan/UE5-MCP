@@ -1,86 +1,113 @@
 # Model Context Protocol (MCP)
 
-## 概要
-Model Context Protocol (MCP) は、Blenderと Unreal Engine 5 (UE5) にAI駆動の自動化機能を統合するフレームワークです。プロシージャル生成、アセット管理、ゲームプレイプログラミング支援などを可能にします。
+## システム概要
+
+MCPはBlender 4.4.0とUnreal Engine 5.5を連携させ、OpenAI APIを活用してゲーム開発を効率化するフレームワークです。サーバー-クライアントアーキテクチャに基づいており、以下のコンポーネントで構成されています：
+
+- **MCPサーバー**: 中央制御システム（APIサーバー）
+- **Blender-MCP**: Blenderとの連携モジュール
+- **UE5-MCP**: Unreal Engine 5との連携モジュール
+- **AI統合**: OpenAI APIを使用したコンテンツ生成機能
 
 ## 主な機能
-- **AIによる自動化**: 自然言語コマンドを使用したシーン生成とアセット作成
-- **Blender-MCP**: Blenderでのモデリング、テクスチャリング、最適化の自動化
-- **UE5-MCP**: UE5でのレベルデザイン、Blueprint自動化、デバッグのサポート
-- **シームレスな統合**: BlenderからUE5へのアセット移行を効率化
 
-## インストール
+### Blender連携機能
+- 3Dモデル作成（基本形状・カスタム形状）
+- マテリアル適用と編集
+- アセットのエクスポート（FBX、OBJ、GLBなど）
+- UE5へのアセット転送
 
-### 前提条件
+### UE5連携機能
+- レベル作成（ThirdPersonなど各種テンプレート）
+- 地形生成（山岳、平地、砂漠など）
+- Blueprint自動生成・編集
+- アセットインポートと配置
+- ライティングビルドなどのワークフロー自動化
+
+### AI支援機能
+- 自然言語コマンド解析
+- ゲームコンセプト・キャラクター設定の生成
+- バックグラウンドストーリー作成
+- アセットデザイン提案
+
+## セットアップ
+
+### 必要環境
 - Python 3.x
-- Blender 3.x以降（Blender-MCPを使用する場合）
-- Unreal Engine 5.1以降（UE5-MCPを使用する場合）
+- Blender 4.4.0以降
+- Unreal Engine 5.5以降
+- OpenAI APIキー
 
-### 依存関係のインストール
-```bash
-pip install -r requirements.txt
-```
-
-### 設定
-1. `.env.example`ファイルを`.env`にコピーし、適切な値を設定します。
-2. OpenAI APIキーを設定します（AI機能を使用する場合）。
-3. 必要に応じて`config.yml`の設定を調整します。
+### 設定ファイル
+- `.env`: 環境変数設定ファイル
+- `mcp_settings.json`: システム設定ファイル
 
 ## 使用方法
 
-### MCPサーバーの起動
+### サーバー起動
 ```bash
-python server.py
+python run_mcp.py all
 ```
 
-### Blender-MCPモジュールの起動
+### シンプルなゲーム作成
 ```bash
-python blender_mcp.py
+python simple_ue5_game.py
 ```
 
-### UE5-MCPモジュールの起動
+### Blender-UE5アセット連携
 ```bash
-python ue5_mcp.py
+python blender_to_ue5_asset.py
 ```
 
-## API リファレンス
+### AI開発アシスタント
+```bash
+python ai_ue5_assistant.py
+```
 
-### MCPサーバーAPI
-- `GET /api/status`: サーバーのステータスを取得
-- `POST /api/blender/command`: Blenderコマンドを実行
-- `POST /api/unreal/command`: UE5コマンドを実行
-- `POST /api/ai/generate`: AIによるコンテンツ生成
+### バッチワークフロー実行
+```bash
+python run_mcp_workflow.py blender_to_ue5
+python run_mcp_workflow.py simple_game
+python run_mcp_workflow.py ai_assistant
+```
+
+## プログラミングインターフェース
 
 ### Blender-MCP API
-- `GET /api/status`: Blender-MCPのステータスを取得
-- `POST /api/command`: Blenderコマンドを実行
-  - コマンド例: `generate_scene`, `add_object`, `generate_texture`, `export_asset`など
+```python
+# Blender内で実行
+from blender_integration import BlenderMCPIntegration
+
+integration = BlenderMCPIntegration()
+integration.create_simple_model("sword", "GameSword")
+integration.send_to_ue5("GameSword")
+```
 
 ### UE5-MCP API
-- `GET /api/status`: UE5-MCPのステータスを取得
-- `POST /api/command`: UE5コマンドを実行
-  - コマンド例: `create_level`, `import_asset`, `create_blueprint`, `generate_terrain`など
+```python
+# UE5内で実行
+from ue5_integration import UE5MCPIntegration
 
-## 使用例
-
-### Blenderでのシーン生成
-```bash
-curl -X POST http://localhost:5001/api/command \
-  -H "Content-Type: application/json" \
-  -d '{"command": "generate_scene", "params": {"description": "A sci-fi spaceship interior with neon lighting"}}'
+integration = UE5MCPIntegration()
+integration.create_level("MCPTestLevel", "ThirdPerson")
+integration.generate_terrain(terrain_type="mountainous")
 ```
 
-### UE5でのBlueprintの作成
-```bash
-curl -X POST http://localhost:5002/api/command \
-  -H "Content-Type: application/json" \
-  -d '{"command": "create_blueprint", "params": {"name": "EnemyAI", "class": "Character", "ai_generate": true, "description": "An enemy AI that patrols and attacks the player"}}'
-```
+## メンテナンス・開発
 
-## トラブルシューティング
-- サーバー接続エラー: ポート設定とファイアウォールの設定を確認してください
-- Blender/UE5連携エラー: 必要なプラグインが有効になっていることを確認してください
-- AI生成エラー: OpenAI APIキーが正しく設定されていることを確認してください
+### ログファイル
+- `mcp_server.log`
+- `blender_mcp.log`
+- `ue5_mcp.log`
+- `ai_ue5_assistant.log`
+- `simple_ue5_game.log`
+- `blender_to_ue5_asset.log`
+
+### デバッグ
+設定ファイル`mcp_settings.json`の`debug`フラグを`true`に設定するとデバッグモードで実行されます。
+
+### OpenAI API
+キーが設定されていればOpenAI APIを使用し、未設定の場合はモックモードで動作します。
 
 ## ライセンス
 MITライセンス 

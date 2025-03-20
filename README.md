@@ -1,84 +1,90 @@
 # Model Context Protocol (MCP)
 
 ## 概要
-Model Context Protocol (MCP) は、Blenderと Unreal Engine 5 (UE5) にAI駆動の自動化機能を統合するフレームワークです。プロシージャル生成、アセット管理、ゲームプレイプログラミング支援などを可能にします。
+Model Context Protocol (MCP) は、Blender 4.4.0と Unreal Engine 5.5 (UE5)にAI駆動の自動化機能を統合するフレームワークです。OpenAI APIを活用して、プロシージャル生成、アセット管理、ゲームプレイプログラミング支援などを実現します。
 
 ## 主な機能
-- **AIによる自動化**: 自然言語コマンドを使用したシーン生成とアセット作成（OpenAI APIキーが設定されていない場合はモックレスポンスを返します）
+- **AIによる自動化**: 自然言語コマンドを使用したシーン生成とアセット作成（OpenAI APIを使用）
 - **Blender-MCP**: Blenderでのモデリング、テクスチャリング、最適化の自動化
 - **UE5-MCP**: UE5でのレベルデザイン、Blueprint自動化、デバッグのサポート
-- **シームレスな統合**: BlenderからUE5へのアセット移行を効率化
+- **シームレスな統合**: BlenderからUE5へのアセット転送ワークフロー
 - **クロスプラットフォーム**: Windows、macOS、Linuxでの動作をサポート
 
 ## インストール
 
 ### 前提条件
 - Python 3.x
-- Node.js 12.x以上（UVコマンドでのインストールに必要）
-- Blender 3.x以降（Blender-MCPを使用する場合）
-- Unreal Engine 5.1以降（UE5-MCPを使用する場合）
+- Blender 4.4.0以降（Blender-MCPを使用する場合）
+- Unreal Engine 5.5以降（UE5-MCPを使用する場合）
+- OpenAI APIキー（AIアシスト機能を使用する場合）
 
-### 簡単インストール（推奨）
-
-#### 方法1: UVコマンドでインストール
+### インストール手順
 ```bash
 # リポジトリをクローン
 git clone https://github.com/tacyan/UE5-MCP.git
 cd UE5-MCP
 
-# Node.jsでインストール (Windows/Mac/Linux共通)
-npm install
-```
-
-#### 方法2: プラットフォーム別のスクリプトでインストール
-**Windows:**
-```bash
-# install.batをダブルクリックするか、コマンドラインで以下を実行:
-install.bat
-```
-
-**macOS/Linux:**
-```bash
-# ターミナルで実行:
-chmod +x install.sh
-./install.sh
-```
-
-### 手動インストール
-```bash
 # 依存関係のインストール
 pip install -r requirements.txt
 
 # 設定
 cp .env.example .env
-# 必要に応じて.envを編集
+cp mcp_settings.json.example mcp_settings.json
+# 必要に応じて.envとmcp_settings.jsonを編集
 ```
 
-## 設定
+## セットアップと設定
 
-### JSON設定ファイル
-MCPは`mcp_settings.json`ファイルを使用して設定を管理します。このファイルはインストール時に自動的に作成されますが、手動で編集することもできます。
+### 環境変数の設定
+`.env`ファイルで以下の設定を行います：
+
+```
+# OpenAI API設定
+OPENAI_API_KEY=your_openai_api_key_here
+
+# サーバー設定
+MCP_SERVER_HOST=127.0.0.1
+MCP_SERVER_PORT=8000
+
+# Blender設定
+BLENDER_ENABLED=true
+BLENDER_PORT=8001
+BLENDER_PATH=/path/to/blender
+
+# UE5設定
+UE5_ENABLED=true
+UE5_PORT=8002
+UE5_PATH=/path/to/unreal/editor
+```
+
+### MCP設定ファイル
+`mcp_settings.json`ファイルでシステム全体の設定を管理します：
 
 ```json
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 5000,
-    "autoStart": true
+    "port": 8000,
+    "debug": false
   },
   "modules": {
     "blender": {
       "enabled": true,
-      "port": 5001
+      "port": 8001,
+      "path": "/path/to/blender",
+      "autostart": true
     },
     "unreal": {
       "enabled": true,
-      "port": 5002
+      "port": 8002,
+      "path": "/path/to/unreal/editor",
+      "autostart": true
     }
   },
   "ai": {
-    "provider": "mock",
-    "model": "gpt-4"
+    "provider": "openai",
+    "model": "gpt-4",
+    "temperature": 0.7
   },
   "paths": {
     "blender": "",
@@ -93,94 +99,170 @@ MCPは`mcp_settings.json`ファイルを使用して設定を管理します。�
 }
 ```
 
-### 環境変数
-`.env`ファイルで以下の環境変数を設定できます：
-
-```
-# OpenAI API設定（オプション）
-OPENAI_API_KEY=your_openai_api_key_here
-
-# サーバー設定のオーバーライド
-MCP_SERVER_HOST=127.0.0.1
-MCP_SERVER_PORT=5000
-DEBUG=false
-```
-
 ## 使用方法
 
-### NPM スクリプト（UVコマンド）
-```bash
-# すべてのコンポーネントを起動
-npm start
+### 1. MCPサーバーの起動
 
-# 個別コンポーネントを起動
-npm run start:server   # サーバーのみ
-npm run start:blender  # サーバー + Blender-MCP
-npm run start:ue5      # サーバー + UE5-MCP
-```
+MCPサーバーとモジュールを起動するには：
 
-### Python スクリプト
 ```bash
-# すべてのコンポーネントを起動
 python run_mcp.py all
-
-# 個別コンポーネントを起動
-python run_mcp.py server   # サーバーのみ
-python run_mcp.py blender  # サーバー + Blender-MCP
-python run_mcp.py ue5      # サーバー + UE5-MCP
 ```
 
-## API リファレンス
+特定のモジュールのみ起動する場合：
 
-### MCPサーバーAPI
-- `GET /api/status`: サーバーのステータスを取得
-- `POST /api/blender/command`: Blenderコマンドを実行
-- `POST /api/unreal/command`: UE5コマンドを実行
-- `POST /api/ai/generate`: AIによるコンテンツ生成
-
-### Blender-MCP API
-- `GET /api/status`: Blender-MCPのステータスを取得
-- `POST /api/command`: Blenderコマンドを実行
-  - コマンド例: `generate_scene`, `add_object`, `generate_texture`, `export_asset`など
-
-### UE5-MCP API
-- `GET /api/status`: UE5-MCPのステータスを取得
-- `POST /api/command`: UE5コマンドを実行
-  - コマンド例: `create_level`, `import_asset`, `create_blueprint`, `generate_terrain`など
-
-## AIモード
-
-### モックモード (デフォルト)
-OpenAI APIキーが設定されていない場合、システムは自動的にモックモードで動作します。このモードでは、AIコンテンツ生成のリクエストに対して事前に設定されたレスポンスを返します。開発とテストに適しています。
-
-### OpenAIモード
-OpenAI APIキーを設定すると、システムはOpenAI APIを使用してAIコンテンツを生成します。本番環境での使用に適しています。
-
-## 使用例
-
-### Blenderでのシーン生成
 ```bash
-curl -X POST http://localhost:5001/api/command \
-  -H "Content-Type: application/json" \
-  -d '{"command": "generate_scene", "params": {"description": "A sci-fi spaceship interior with neon lighting"}}'
+python run_mcp.py server  # サーバーのみ
+python run_mcp.py blender # サーバー + Blender連携
+python run_mcp.py ue5     # サーバー + UE5連携
 ```
 
-### UE5でのBlueprintの作成
+### 2. 機能テスト
+
+#### Blender-UE5連携テスト
+Blenderでモデルを作成してUE5に転送：
+
 ```bash
-curl -X POST http://localhost:5002/api/command \
-  -H "Content-Type: application/json" \
-  -d '{"command": "create_blueprint", "params": {"name": "EnemyAI", "class": "Character", "ai_generate": true, "description": "An enemy AI that patrols and attacks the player"}}'
+python blender_to_ue5_asset.py
+```
+
+#### UE5ゲーム作成テスト
+シンプルな3Dアクションゲームの基本構造を作成：
+
+```bash
+python simple_ue5_game.py
+```
+
+#### AI駆動ゲーム開発アシスタント
+自然言語でUE5の機能を制御するインタラクティブアシスタントを起動：
+
+```bash
+python ai_ue5_assistant.py
+```
+
+### 3. ワークフロー実行
+
+統合ワークフローを実行するには：
+
+```bash
+# BlenderからUE5へのアセット転送ワークフロー
+python run_mcp_workflow.py blender_to_ue5
+
+# シンプルなUE5ゲーム作成ワークフロー
+python run_mcp_workflow.py simple_game
+
+# AI駆動ゲーム開発アシスタント
+python run_mcp_workflow.py ai_assistant
+```
+
+Blender内でスクリプトを実行する場合：
+
+```bash
+python run_mcp_workflow.py blender_to_ue5 --blender
+```
+
+UE5内でスクリプトを実行する場合：
+
+```bash
+python run_mcp_workflow.py simple_game --ue5
+```
+
+## Blender連携機能
+
+MCPは以下のBlender機能をサポートしています：
+
+- **自動モデル作成**: 基本形状、カスタム形状（剣など）の作成
+- **マテリアル適用**: 色、メタリック度、ラフネスなどのプロパティを設定
+- **モデルエクスポート**: FBX, OBJ, GLB形式でエクスポート
+- **UE5への転送**: モデルをUE5プロジェクトに自動転送
+
+Blender内での使用例：
+```python
+# Blenderエディタ内でスクリプトを実行
+from blender_integration import BlenderMCPIntegration
+
+integration = BlenderMCPIntegration()
+integration.create_simple_model("sword", "GameSword")
+integration.apply_material("GameSword", "MetalSwordMaterial", metallic=0.9)
+integration.send_to_ue5("GameSword", "fbx")
+```
+
+## UE5連携機能
+
+MCPは以下のUE5機能をサポートしています：
+
+- **レベル作成**: 様々なテンプレートからの新規レベル作成
+- **地形生成**: カスタマイズ可能な地形の自動生成
+- **Blueprint自動化**: AI駆動のBlueprint作成
+- **アセット管理**: インポート、配置、マテリアル設定
+- **ワークフロー自動化**: ライティングビルドなどの自動処理
+
+UE5内での使用例：
+```python
+# UE5エディタ内でスクリプトを実行
+from ue5_integration import UE5MCPIntegration
+
+integration = UE5MCPIntegration()
+integration.create_level("MCPTestLevel", "ThirdPerson")
+integration.generate_terrain(size_x=4096, terrain_type="mountainous")
+integration.create_blueprint("BP_CollectibleItem", "Actor", "収集可能なアイテム")
+```
+
+## AIアシスタント機能
+
+自然言語でUE5機能を制御するAIアシスタントを使用できます：
+
+- **コマンド変換**: 自然言語をUE5コマンドに変換
+- **コンテンツ生成**: キャラクター、ストーリー、ゲームコンセプトの生成
+- **問題解決**: ゲーム開発上の課題に対するAIアシスト
+
+使用例：
+```
+> コマンドを入力してください: 山と森のある大きなオープンワールドの地形を生成して
+
+🔍 '山と森のある大きなオープンワールドの地形を生成して' を解析しています...
+🚀 コマンド 'generate_terrain' を実行しています...
+✅ 成功: mountainous地形の生成が完了しました
 ```
 
 ## トラブルシューティング
-- サーバー接続エラー: ポート設定とファイアウォールの設定を確認してください
-- Blender/UE5連携エラー: 必要なプラグインが有効になっていることを確認してください
-- Python関連エラー: 
-  - Windowsでは`python`コマンドが使用可能か確認してください
-  - Mac/Linuxでは`python3`コマンドが使用可能か確認してください
-- AI生成エラー: 
-  - モックモードの場合: 正常に機能します、実際のAI生成は行われません
-  - OpenAIモードの場合: OpenAI APIキーが正しく設定されていることを確認してください
+
+### サーバー接続エラー
+サーバー接続エラーが発生した場合は、サーバーが実行中かを確認し、ポート設定を確認してください：
+
+```bash
+# サーバー状態確認
+curl http://127.0.0.1:8000/api/status
+
+# 実行中のサーバープロセスを確認
+ps aux | grep run_mcp
+```
+
+### ポート競合
+ポートが既に使用されている場合は、設定ファイルで別のポートを指定するか、競合するプロセスを終了してください：
+
+```bash
+# 競合するプロセスの終了
+pkill -f "run_mcp.py"
+```
+
+### OpenAI APIエラー
+APIキーが正しく設定されていることを確認し、`.env`ファイルを確認してください。APIキーにスペースや改行がないことを確認してください。
+
+## 開発資料
+
+詳細なドキュメントは以下の資料を参照してください：
+
+- [アーキテクチャ](./architecture.md)
+- [Blender-MCP連携](./blender_mcp.md)
+- [UE5-MCP連携](./ue5_mcp.md)
+- [AI統合](./ai_integration.md)
+- [コマンドリファレンス](./commands.md)
 
 ## ライセンス
-MITライセンス
+
+このプロジェクトは[MITライセンス](./LICENSE.md)の下で公開されています。
+
+## 貢献
+
+プロジェクトへの貢献方法については[CONTRIBUTING.md](./CONTRIBUTING.md)を参照してください。
