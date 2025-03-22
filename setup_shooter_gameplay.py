@@ -353,83 +353,179 @@ def create_level():
     
     client = UE5MCPClient(host="127.0.0.1", port=8080)
     
+    # ディレクトリの確認と作成
+    check_maps_script = """
+import unreal
+
+maps_path = "/Game/ShooterGame/Maps"
+level_name = "ShooterGameLevel"
+full_level_path = f"{maps_path}/{level_name}"
+
+# Mapsディレクトリの確認と作成
+if not unreal.EditorAssetLibrary.does_directory_exist(maps_path):
+    print(f"Mapsディレクトリが存在しません。作成します: {maps_path}")
+    unreal.EditorAssetLibrary.make_directory(maps_path)
+    maps_created = unreal.EditorAssetLibrary.does_directory_exist(maps_path)
+    print(f"Mapsディレクトリの作成結果: {maps_created}")
+else:
+    print(f"Mapsディレクトリは既に存在します: {maps_path}")
+    
+# レベルが既に存在するか確認
+level_exists = unreal.EditorAssetLibrary.does_asset_exist(full_level_path)
+print(f"レベルの存在確認: {level_exists} - {full_level_path}")
+
+print("ディレクトリ確認完了")
+"""
+    
+    maps_check_result = client.execute_unreal_command("execute_python", {"script": check_maps_script})
+    logger.info(f"マップフォルダの確認結果: {maps_check_result}")
+    
     # レベル作成のPythonスクリプト
-    python_script = """
+    level_script = """
 import unreal
 
 # アセットパス
-level_path = "{0}/ShooterGameLevel"
-player_bp_path = "{1}/BP_PlayerShip"
-enemy_bp_path = "{1}/BP_EnemyShip"
-game_mode_bp_path = "{1}/BP_ShooterGameMode"
+maps_path = "/Game/ShooterGame/Maps"
+level_name = "ShooterGameLevel"
+full_level_path = f"{maps_path}/{level_name}"
+player_bp_path = "/Game/ShooterGame/Blueprints/BP_PlayerShip"
+enemy_bp_path = "/Game/ShooterGame/Blueprints/BP_EnemyShip"
+game_mode_bp_path = "/Game/ShooterGame/Blueprints/BP_ShooterGameMode"
 
 # ゲームレベルを作成
 def create_game_level():
     # 新しいレベルを作成
     level_subsystem = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     
-    # 既存のレベルを閉じる
-    level_subsystem.new_level("/Game/ShooterGame/Maps/ShooterGameLevel")
+    try:
+        # 既存のレベルを閉じる
+        level_subsystem.new_level(full_level_path)
+        print(f"新しいレベルを作成しました: {full_level_path}")
+    except Exception as e:
+        print(f"レベル作成中にエラーが発生しました: {e}")
+        # 既存のレベルを開いてみる
+        try:
+            if unreal.EditorAssetLibrary.does_asset_exist(full_level_path):
+                level_subsystem.load_level(full_level_path)
+                print(f"既存のレベルを開きました: {full_level_path}")
+            else:
+                print(f"レベルが存在せず、作成もできませんでした: {full_level_path}")
+                return "レベル作成に失敗しました"
+        except Exception as e2:
+            print(f"既存レベルを開く際にエラーが発生しました: {e2}")
+            return "レベル作成に失敗しました"
     
     # レベルを保存
-    level_subsystem.save_current_level()
+    try:
+        level_subsystem.save_current_level()
+        print("レベルを保存しました")
+    except Exception as e:
+        print(f"レベル保存中にエラーが発生しました: {e}")
     
     # プレイヤーを配置
-    if unreal.EditorAssetLibrary.does_asset_exist(player_bp_path):
-        player_class = unreal.EditorAssetLibrary.load_blueprint_class(player_bp_path)
-        player_location = unreal.Vector(0, 0, 100)
-        player_rotation = unreal.Rotator(0, 0, 0)
-        player_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(player_class, player_location, player_rotation)
+    try:
+        if unreal.EditorAssetLibrary.does_asset_exist(player_bp_path):
+            player_class = unreal.EditorAssetLibrary.load_blueprint_class(player_bp_path)
+            player_location = unreal.Vector(0, 0, 100)
+            player_rotation = unreal.Rotator(0, 0, 0)
+            player_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(player_class, player_location, player_rotation)
+            print(f"プレイヤーを配置しました: {player_bp_path}")
+        else:
+            print(f"プレイヤーブループリントが見つかりません: {player_bp_path}")
+    except Exception as e:
+        print(f"プレイヤー配置中にエラーが発生しました: {e}")
     
     # 敵を配置
-    if unreal.EditorAssetLibrary.does_asset_exist(enemy_bp_path):
-        enemy_class = unreal.EditorAssetLibrary.load_blueprint_class(enemy_bp_path)
-        
-        # 複数の敵を配置
-        enemy_positions = [
-            unreal.Vector(500, 200, 100),
-            unreal.Vector(500, -200, 100),
-            unreal.Vector(700, 0, 100),
-            unreal.Vector(900, 300, 100),
-            unreal.Vector(900, -300, 100)
-        ]
-        
-        for pos in enemy_positions:
-            enemy_rotation = unreal.Rotator(0, 180, 0)
-            enemy_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(enemy_class, pos, enemy_rotation)
+    try:
+        if unreal.EditorAssetLibrary.does_asset_exist(enemy_bp_path):
+            enemy_class = unreal.EditorAssetLibrary.load_blueprint_class(enemy_bp_path)
+            
+            # 複数の敵を配置
+            enemy_positions = [
+                unreal.Vector(500, 200, 100),
+                unreal.Vector(500, -200, 100),
+                unreal.Vector(700, 0, 100),
+                unreal.Vector(900, 300, 100),
+                unreal.Vector(900, -300, 100)
+            ]
+            
+            for pos in enemy_positions:
+                enemy_rotation = unreal.Rotator(0, 180, 0)
+                enemy_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(enemy_class, pos, enemy_rotation)
+            print(f"敵を配置しました: {enemy_bp_path}")
+        else:
+            print(f"敵ブループリントが見つかりません: {enemy_bp_path}")
+    except Exception as e:
+        print(f"敵配置中にエラーが発生しました: {e}")
     
     # レベルを保存
-    level_subsystem.save_current_level()
+    try:
+        level_subsystem.save_current_level()
+        print("レベルの変更を保存しました")
+    except Exception as e:
+        print(f"変更保存中にエラーが発生しました: {e}")
     
     # ゲームモードを設定
-    if unreal.EditorAssetLibrary.does_asset_exist(game_mode_bp_path):
-        game_mode_class = unreal.EditorAssetLibrary.load_blueprint_class(game_mode_bp_path)
-        
-        # レベルのゲームモードを設定
-        with unreal.ScopedEditorTransaction("Set Level GameMode") as trans:
-            world_settings = unreal.EditorLevelLibrary.get_game_mode_settings_for_current_level()
-            if world_settings:
-                world_settings.set_editor_property("game_mode_override", game_mode_class)
+    try:
+        if unreal.EditorAssetLibrary.does_asset_exist(game_mode_bp_path):
+            game_mode_class = unreal.EditorAssetLibrary.load_blueprint_class(game_mode_bp_path)
+            
+            # レベルのゲームモードを設定
+            with unreal.ScopedEditorTransaction("Set Level GameMode") as trans:
+                world_settings = unreal.EditorLevelLibrary.get_game_mode_settings_for_current_level()
+                if world_settings:
+                    world_settings.set_editor_property("game_mode_override", game_mode_class)
+            print(f"ゲームモードを設定しました: {game_mode_bp_path}")
+        else:
+            print(f"ゲームモードブループリントが見つかりません: {game_mode_bp_path}")
+    except Exception as e:
+        print(f"ゲームモード設定中にエラーが発生しました: {e}")
+    
+    # 最終的なレベル保存
+    try:
+        level_subsystem.save_current_level()
+        print("最終レベル変更を保存しました")
+    except Exception as e:
+        print(f"最終保存中にエラーが発生しました: {e}")
     
     return "ゲームレベルの作成が完了しました"
 
 # 実行
-result = create_game_level()
-print(result)
-""".format(UE5_MAPS_PATH, UE5_BP_PATH)
+try:
+    result = create_game_level()
+    print(result)
+except Exception as e:
+    print(f"レベル作成関数実行中に例外が発生しました: {e}")
+    print("レベル作成に失敗しました")
+"""
+
+    level_result = client.execute_unreal_command("execute_python", {"script": level_script})
     
-    params = {
-        "script": python_script
-    }
-    
-    result = client.execute_unreal_command("execute_python", params)
-    
-    if result.get("status") == "success":
+    if level_result.get("status") == "success":
         logger.info("ゲームレベルの作成に成功しました")
+        # レベルが正常に開かれたか確認
+        check_level_script = """
+import unreal
+level_path = "/Game/ShooterGame/Maps/ShooterGameLevel"
+is_open = unreal.EditorAssetLibrary.does_asset_exist(level_path)
+print(f"レベル確認: {level_path} - 存在する: {is_open}")
+
+# デフォルトマップとして設定
+if is_open:
+    try:
+        project_settings = unreal.get_default_object(unreal.ProjectPackagingSettings)
+        project_settings.set_editor_property("map_to_cook", [level_path])
+        unreal.EditorAssetLibrary.save_loaded_asset(project_settings)
+        print("デフォルトマップとして設定しました")
+    except Exception as e:
+        print(f"デフォルトマップ設定中にエラー: {e}")
+"""
+        level_check_result = client.execute_unreal_command("execute_python", {"script": check_level_script})
+        logger.info(f"レベル確認結果: {level_check_result}")
     else:
-        logger.error(f"ゲームレベルの作成に失敗しました: {result}")
+        logger.error(f"ゲームレベルの作成に失敗しました: {level_result}")
     
-    return result.get("status") == "success"
+    return level_result.get("status") == "success"
 
 def setup_player_input():
     """プレイヤー入力設定を行う"""
@@ -497,18 +593,106 @@ def main():
     """メイン実行関数"""
     logger.info("===== シューティングゲームのゲームプレイロジック設定を開始します =====")
     
-    # ブループリントディレクトリの作成
+    # ディレクトリ作成を確実に行う
     client = UE5MCPClient(host="127.0.0.1", port=8080)
-    python_script = f"""
+
+    # より直接的なディレクトリ作成スクリプト
+    create_dirs_script = """
 import unreal
-# ディレクトリを作成
-unreal.EditorAssetLibrary.make_directory('{UE5_BP_PATH}')
-unreal.EditorAssetLibrary.make_directory('{UE5_MAPS_PATH}')
-print("ディレクトリの作成が完了しました")
+import os
+
+# すべてのディレクトリ作成を確実に行うスクリプト
+def ensure_directories():
+    # ベースパス
+    shooter_game_path = "/Game/ShooterGame"
+    # サブディレクトリ
+    subdirs = ["Assets", "Blueprints", "Maps"]
+    
+    try:
+        # ShooterGameディレクトリの確認と作成
+        if not unreal.EditorAssetLibrary.does_directory_exist(shooter_game_path):
+            print(f"ShooterGameディレクトリを作成します: {shooter_game_path}")
+            success = unreal.EditorAssetLibrary.make_directory(shooter_game_path)
+            print(f"ShooterGameディレクトリ作成結果: {success}")
+        else:
+            print(f"ShooterGameディレクトリは既に存在します: {shooter_game_path}")
+        
+        # 各サブディレクトリを個別に作成（トランザクションを個別に実行）
+        for subdir in subdirs:
+            full_path = f"{shooter_game_path}/{subdir}"
+            
+            if not unreal.EditorAssetLibrary.does_directory_exist(full_path):
+                print(f"{subdir}ディレクトリを作成します: {full_path}")
+                with unreal.ScopedEditorTransaction(f"Create {subdir} Directory") as trans:
+                    success = unreal.EditorAssetLibrary.make_directory(full_path)
+                    # キャッシュを更新
+                    unreal.EditorAssetLibrary.refresh_asset_directories([shooter_game_path])
+                print(f"{subdir}ディレクトリ作成結果: {success}")
+            else:
+                print(f"{subdir}ディレクトリは既に存在します: {full_path}")
+        
+        # 作成されたかどうかを確認
+        all_ok = True
+        for subdir in subdirs:
+            full_path = f"{shooter_game_path}/{subdir}"
+            exists = unreal.EditorAssetLibrary.does_directory_exist(full_path)
+            print(f"ディレクトリ確認: {full_path} - 存在する: {exists}")
+            if not exists:
+                all_ok = False
+                
+        # 最終確認
+        print(f"すべてのディレクトリが存在するか: {all_ok}")
+        
+        # コンテンツブラウザを更新
+        unreal.EditorAssetLibrary.refresh_asset_directories([shooter_game_path])
+        
+        return all_ok
+    except Exception as e:
+        print(f"ディレクトリ作成中にエラーが発生しました: {e}")
+        return False
+
+# 直接実行
+success = ensure_directories()
+print(f"ディレクトリ作成処理の結果: {success}")
+"""
+
+    # ディレクトリ作成コマンドの実行
+    dir_result = client.execute_unreal_command("execute_python", {"script": create_dirs_script})
+    logger.info(f"ディレクトリ作成結果: {dir_result}")
+
+    # ディレクトリが正しく作成されるのを待つ（0.5秒）
+    time.sleep(0.5)
+    
+    # 再度確認
+    verify_script = """
+import unreal
+paths = ["/Game/ShooterGame/Assets", "/Game/ShooterGame/Blueprints", "/Game/ShooterGame/Maps"]
+exists = {}
+for path in paths:
+    exists[path] = unreal.EditorAssetLibrary.does_directory_exist(path)
+    print(f"パス確認: {path} - 存在する: {exists[path]}")
+
+all_ok = all(exists.values())
+print(f"すべてのディレクトリが存在するか: {all_ok}")
+
+# 必要に応じて再作成
+if not all_ok:
+    print("不足しているディレクトリを再作成します")
+    for path, exists_flag in exists.items():
+        if not exists_flag:
+            print(f"ディレクトリを作成します: {path}")
+            success = unreal.EditorAssetLibrary.make_directory(path)
+            print(f"ディレクトリ作成結果: {success}")
+    
+    # コンテンツブラウザを更新
+    unreal.EditorAssetLibrary.refresh_asset_directories(["/Game"])
+    unreal.EditorAssetLibrary.refresh_asset_directories(["/Game/ShooterGame"])
 """
     
-    client.execute_unreal_command("execute_python", {"script": python_script})
+    verify_result = client.execute_unreal_command("execute_python", {"script": verify_script})
+    logger.info(f"ディレクトリ検証結果: {verify_result}")
     
+    # 処理の続き
     # ブループリントの設定
     success = True
     
