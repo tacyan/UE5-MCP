@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "MCP C++ Plugin",
+	"Description": "Model Context Protocol C++ Plugin for Unreal Engine",
+	"Category": "Game",
+	"CreatedBy": "MCP Framework",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "MCPCpp",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+} 
